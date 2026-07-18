@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+
+  <nav class="top_nav">
+    <a href="{{ url_for('logout') }}" class="nav_btn" title="Log out"><i class="fa-solid fa-right-from-bracket"></i></a>
+  </nav>
+
+  <h1>{{ title }}</h1>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <p class="notification">{{ messages[0] }}</p>
+    {% endif %}
+  {% endwith %}
+
+  {% if mode != 'active' %}
+    <div class="card idle_card">
+      <h2><i class="fa-solid fa-triangle-exclamation"></i> Idle</h2>
+      <p>{{ idle_reason }}</p>
+      <p class="muted">The SD card has been unmounted to protect its file system.</p>
+      <div class="update_buttons">
+        {% if not drive_authorized %}
+          <a href="{{ url_for('authorize') }}" class="save_btn">Authorize Google Drive</a>
+        {% endif %}
+        <form method="POST" action="{{ url_for('retry') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="save_btn" style="width:100%">Retry Google Drive</button>
+        </form>
+      </div>
+    </div>
+  {% else %}
+    <div class="card">
+      <h2>Google Drive</h2>
+      <p class="ok"><i class="fa-solid fa-circle-check"></i> Connected. Uploads go to folder <b>{{ drive_folder }}</b>.</p>
+    </div>
+
+    <div class="card">
+      <h2>SD card</h2>
+      <p id="card_status">Scanning…</p>
+
+      <form method="POST" action="{{ url_for('save_settings') }}" class="option_form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="checkbox_row">
+          <input type="checkbox" name="delete_after_upload" onchange="this.form.submit()" {% if delete_after %}checked{% endif %}>
+          Delete files from SD card after successful upload
+        </label>
+      </form>
+
+      <form method="POST" action="{{ url_for('start') }}" id="start_form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="save_btn" id="start_btn" disabled>Upload all</button>
+      </form>
+
+      <div id="progress_wrap" class="hidden">
+        <p id="folder_text" class="muted"></p>
+        <div class="progress_bar"><div class="progress_fill" id="progress_fill"></div></div>
+        <p id="progress_text"></p>
+        <details id="transferred_box">
+          <summary>Transferred (<span id="transferred_count">0</span>)</summary>
+          <ul id="transferred_list" class="file_list"></ul>
+        </details>
+        <ul id="error_list" class="error_list"></ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Change password</h2>
+      <form method="POST" action="{{ url_for('change_password') }}" class="update_buttons">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="password" name="current_password" placeholder="Current password" required>
+        <input type="password" name="new_password" placeholder="New password" required>
+        <button type="submit" class="save_btn">Update password</button>
+      </form>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/home.js') }}"></script>
+  {% endif %}
+{% endblock %}

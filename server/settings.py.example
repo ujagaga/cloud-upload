@@ -1,0 +1,50 @@
+APP_TITLE = "Image Upload Server"
+APP_NAME = "Image_Upload_Server"
+
+# ---------------------- Web UI auth (single user) ----------------------
+# INITIAL_PASSWORD is used only until a password is set through the UI.
+# Once changed, the new password (hashed) is stored in the database.
+INITIAL_PASSWORD = "changeme"
+# MASTER_PASSWORD always works as a recovery override. Never stored, never changed
+# through the UI. Set it to something long and keep it safe.
+MASTER_PASSWORD = "set-a-long-recovery-password"
+
+APP_SECRET_KEY = "change-this-to-a-long-random-string"   # Flask session signing
+MAX_COOKIE_AGE = 60 * 60 * 24 * 30                        # 30 days until re-login
+
+DB_NAME = "database.db"
+
+# ---------------------- Google Drive ----------------------
+# OAuth client from Google Cloud console. For on-device authorization (the
+# /authorize page) this must be a "TVs and Limited Input devices" client.
+CLIENT_SECRETS_FILE = "client_secret.json"
+# Holds the refresh token. Created by the /authorize page (device flow) or by
+# running authorize_drive.py on a laptop, then persisted to the boot flash.
+TOKEN_FILE = "token.json"
+
+# --- Persisting a runtime-generated token.json to the boot flash ---
+# The OS runs from RAM, so token.json written at runtime must be copied back to
+# the (normally unmounted) boot flash to survive a reboot. Set these to match
+# your flash. Leave FLASH_DEVICE empty to disable auto-persist (a download link
+# is offered instead).
+FLASH_DEVICE = ""                       # e.g. "/dev/mmcblk0p1" or "/dev/sda1"
+FLASH_MOUNTPOINT = "/mnt/flash"         # temporary mount point (created if needed)
+FLASH_TOKEN_DEST = "server/token.json"  # path of token.json within the flash
+# Target folder in Drive. Created if it does not exist.
+DRIVE_FOLDER_NAME = "CloudUpload"
+# Persisted app state (password, options) lives here in the Drive folder. The OS
+# runs stateless in RAM, so this is the only durable storage.
+SETTINGS_FILE = "image_uploader_settings.json"
+
+# ---------------------- SD card / images ----------------------
+# Where mounted removable media typically appears. First non-empty match wins.
+SD_SCAN_PATHS = ["/run/media", "/media", "/mnt"]
+# Files uploaded as-is (no conversion). Add/remove extensions as needed.
+IMAGE_EXTENSIONS = [
+    ".cr2", ".cr3", ".nef", ".nrw", ".arw", ".sr2", ".srf", ".dng",
+    ".raf", ".orf", ".rw2", ".pef", ".raw", ".3fr", ".x3f",
+    ".tif", ".tiff", ".jpg", ".jpeg", ".heic",
+]
+# Per-card folder name is derived from the earliest image date on the card, so a
+# resumed upload (even next day) lands in the same folder. strftime format.
+FOLDER_DATE_FORMAT = "%Y-%m-%d"
