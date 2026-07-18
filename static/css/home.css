@@ -1,0 +1,118 @@
+.top_nav {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0.5rem 0;
+}
+
+h1 {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.notification {
+  text-align: center;
+  color: var(--accent-color);
+}
+
+.card {
+  background: #f7f7f7;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.card h2 {
+  margin-top: 0;
+  font-size: 1.15rem;
+}
+
+.card input[type="password"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6em;
+  margin-bottom: 0.5em;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1em;
+}
+
+.ok { color: #00944d; }
+.err { color: #c0392b; }
+
+.idle_card {
+  border-left: 4px solid #e0a800;
+  background: #fff8e6;
+}
+.idle_card h2 { color: #b8860b; }
+
+code {
+  background: #eee;
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+
+.hidden { display: none; }
+
+.code_big {
+  font-family: monospace;
+  font-size: 2rem;
+  font-weight: bold;
+  letter-spacing: 0.15em;
+  text-align: center;
+  background: #eee;
+  padding: 0.5rem;
+  border-radius: 6px;
+}
+
+.progress_bar {
+  width: 100%;
+  height: 18px;
+  background: #ddd;
+  border-radius: 9px;
+  overflow: hidden;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.progress_fill {
+  height: 100%;
+  width: 0;
+  background: var(--accent-color);
+  transition: width 0.3s ease;
+}
+
+.muted {
+  color: #666;
+  font-size: 0.9rem;
+  margin: 0.25rem 0;
+}
+
+.option_form {
+  margin: 0.5rem 0 0.75rem;
+}
+
+.checkbox_row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.file_list {
+  font-size: 0.9rem;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-left: 1.2rem;
+}
+
+#transferred_box {
+  margin: 0.5rem 0;
+}
+
+.error_list {
+  color: #c0392b;
+  font-size: 0.9rem;
+  max-height: 160px;
+  overflow-y: auto;
+  padding-left: 1.2rem;
+}

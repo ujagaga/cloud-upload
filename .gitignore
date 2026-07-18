@@ -1,1 +1,8 @@
-client_secret_cloudupload.ujagaga.in.rs.json
+__pycache__
+client_secret.json
+token.json
+settings.py
+.idea
+.venv
+app.log
+app.log.*
