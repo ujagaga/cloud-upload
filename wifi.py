@@ -163,6 +163,15 @@ def _write_netplan_wifi(ssid, password):
 
 
 def _connect_worker(ssid, password, timeout):
+    # hostapd may still be holding wlan0 in AP mode (the normal case: the
+    # caller is on the setup AP right now). This hardware can't run AP and
+    # station mode at once, so the AP must be fully torn down before asking
+    # netplan/wpa_supplicant to claim the interface for a station connection
+    # — applying the new config while hostapd still owns wlan0 is exactly
+    # the conflict that caused real lockups during testing.
+    stop_ap()
+    time.sleep(2)  # let the radio/driver settle before handing wlan0 to wpa_supplicant
+
     tmp_path = _write_netplan_wifi(ssid, password)
     try:
         r = subprocess.run(

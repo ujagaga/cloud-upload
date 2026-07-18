@@ -52,6 +52,7 @@ case "$ACTION" in
     # Drop any client-mode config so it doesn't fight hostapd for the radio.
     rm -f "$NETPLAN_WIFI_FILE"
     netplan apply || true
+    sleep 2  # let the radio/driver settle before hostapd claims the interface
 
     rfkill unblock wifi || true
     ip link set "$IFACE" up
