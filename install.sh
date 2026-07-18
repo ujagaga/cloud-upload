@@ -122,6 +122,13 @@ fi
 sudo mv "$PWD/wifi-sudoers" /etc/sudoers.d/cloud-upload-wifi
 sudo chmod 440 /etc/sudoers.d/cloud-upload-wifi
 
+echo "Enabling mDNS globally (needed for the per-link mDNS resolvectl sets after connecting)..."
+if ! grep -q "^MulticastDNS=yes" /etc/systemd/resolved.conf 2>/dev/null; then
+  sudo sed -i 's/^#\?MulticastDNS=.*/MulticastDNS=yes/' /etc/systemd/resolved.conf
+  grep -q "^MulticastDNS=yes" /etc/systemd/resolved.conf || echo "MulticastDNS=yes" | sudo tee -a /etc/systemd/resolved.conf > /dev/null
+  sudo systemctl restart systemd-resolved
+fi
+
 # --- Service File Creation ---
 echo "Creating systemd service file: $SERVICE_FILE"
 cat <<EOF > "$PWD/$SERVICE_NAME"
