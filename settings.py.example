@@ -46,3 +46,12 @@ IMAGE_EXTENSIONS = [
 # Per-card folder name is derived from the earliest image date on the card, so a
 # resumed upload (even next day) lands in the same folder. strftime format.
 FOLDER_DATE_FORMAT = "%Y-%m-%d"
+
+# ---------------------- WiFi setup AP ----------------------
+# If the device has no internet at all (no Ethernet, no known WiFi), it starts
+# this access point so you can connect from a phone and pick a network. Only
+# one of {AP, station} mode can run on wlan0 at a time on this hardware, so
+# choosing a network always drops this AP.
+WIFI_AP_SSID = "CloudUpload-Setup"
+WIFI_AP_PASSWORD = "setupwifi123"   # WPA2 passphrase for the setup AP itself
+WIFI_CONNECT_TIMEOUT = 30           # seconds to wait for the chosen network before reverting to the AP

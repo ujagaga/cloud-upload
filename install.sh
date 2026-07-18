@@ -10,10 +10,17 @@ if ! sudo apt update -y; then
   exit 1
 fi
 
-if ! sudo apt install -y python3-pip python3-venv; then
+if ! sudo apt install -y python3-pip python3-venv hostapd dnsmasq; then
   echo "Error: Failed to install dependencies. Aborting installation."
   exit 1
 fi
+
+# The Debian/Ubuntu hostapd and dnsmasq packages auto-start a stock instance
+# on install, listening with default (or no) config. This app runs its own
+# instances of both, scoped to wlan0 only, so mask the stock ones to avoid
+# two copies fighting over the interface.
+sudo systemctl disable --now hostapd.service dnsmasq.service 2>/dev/null
+sudo systemctl mask hostapd.service dnsmasq.service
 
 echo "Creating virtual environment..."
 python3 -m venv .venv
@@ -87,6 +94,33 @@ if [ $? -ne 0 ]; then
 fi
 sudo mv "$PWD/sd-automount-sudoers" /etc/sudoers.d/sd-automount
 sudo chmod 440 /etc/sudoers.d/sd-automount
+
+# --- WiFi Setup (fallback AP when there's no internet) ---
+echo "Installing WiFi setup scripts..."
+sudo cp helpers/wifi-ap.sh /usr/local/bin/wifi-ap.sh
+sudo cp helpers/wifi-connect.sh /usr/local/bin/wifi-connect.sh
+sudo cp helpers/wifi-scan.sh /usr/local/bin/wifi-scan.sh
+sudo chmod +x /usr/local/bin/wifi-ap.sh /usr/local/bin/wifi-connect.sh /usr/local/bin/wifi-scan.sh
+if [ $? -ne 0 ]; then
+  echo "Error: Failed to install WiFi setup scripts. Aborting installation."
+  exit 1
+fi
+
+echo "Allowing $USER to run the WiFi setup scripts as root..."
+cat <<EOF | sudo tee "$PWD/wifi-sudoers" > /dev/null
+$USER ALL=(root) NOPASSWD: /usr/local/bin/wifi-ap.sh
+$USER ALL=(root) NOPASSWD: /usr/local/bin/wifi-connect.sh
+$USER ALL=(root) NOPASSWD: /usr/local/bin/wifi-scan.sh
+$USER ALL=(root) NOPASSWD: /usr/bin/resolvectl mdns wlan0 yes
+EOF
+sudo visudo -cf "$PWD/wifi-sudoers"
+if [ $? -ne 0 ]; then
+  echo "Error: Generated WiFi sudoers rule failed validation. Aborting installation."
+  rm -f "$PWD/wifi-sudoers"
+  exit 1
+fi
+sudo mv "$PWD/wifi-sudoers" /etc/sudoers.d/cloud-upload-wifi
+sudo chmod 440 /etc/sudoers.d/cloud-upload-wifi
 
 # --- Service File Creation ---
 echo "Creating systemd service file: $SERVICE_FILE"

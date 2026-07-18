@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+
+  <nav class="top_nav">
+    <a href="{{ url_for('config') }}" class="nav_btn nav_left" title="Back"><i class="fa-solid fa-arrow-left"></i></a>
+    <a href="{{ url_for('logout') }}" class="nav_btn" title="Log out"><i class="fa-solid fa-right-from-bracket"></i></a>
+  </nav>
+
+  <h1>WiFi Setup</h1>
+
+  {% if ap_active %}
+    <div class="card idle_card">
+      <p><i class="fa-solid fa-triangle-exclamation"></i> The device has no internet and is running its own
+         setup WiFi right now. Pick a network below to connect it.</p>
+    </div>
+  {% endif %}
+
+  <div class="card">
+    <h2>Available networks</h2>
+    {% if networks %}
+      <ul id="network_list" class="file_list">
+        {% for n in networks %}
+          <li data-ssid="{{ n.ssid }}">{% if n.secured %}<i class="fa-solid fa-lock"></i> {% endif %}{{ n.ssid }}</li>
+        {% endfor %}
+      </ul>
+      <p class="muted">Tap a network to fill it in below, or type the name manually.
+        {% if ap_active %}Rescanning isn't possible while you're connected to the setup WiFi — this list
+        was captured just before it started.{% endif %}</p>
+    {% else %}
+      <p class="muted">No networks found. Move the device closer to your router, or enter the name manually below.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Connect</h2>
+    <form id="connect_form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="text" id="ssid_input" name="ssid" placeholder="Network name (SSID)" required>
+      <div class="password_row">
+        <input type="password" id="wifi_password" name="password" placeholder="Password (leave blank if open)">
+        <button type="button" class="toggle_pw" data-target="wifi_password" title="Show password"><i class="fa-solid fa-eye"></i></button>
+      </div>
+      <button type="submit" class="save_btn" id="connect_btn">Connect</button>
+    </form>
+    <p id="connect_status"></p>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/config.js') }}"></script>
+  <script>
+    const CSRF_TOKEN = "{{ csrf_token() }}";
+  </script>
+  <script src="{{ url_for('static', filename='js/wifi.js') }}"></script>
+{% endblock %}

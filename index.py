@@ -24,6 +24,7 @@ import gdrive
 import deviceauth
 import sdcard
 import processor
+import wifi
 
 sys.path.insert(0, os.path.dirname(__file__))
 current_path = os.path.dirname(os.path.realpath(__file__))
@@ -210,6 +211,63 @@ def _periodic_reconnect_loop():
                 print(f"Periodic reconnect: Drive reachable. {result[1] if result else ''}")
 
 
+WIFI_CHECK_INTERVAL_SECONDS = 30
+_wifi_ap_started_by_watchdog = False
+
+
+def _wifi_watchdog_loop():
+    """Start the setup AP if the device has no internet at all (no Ethernet,
+    no known WiFi) so it's never unreachable in the field. This is a
+    separate, lower-level check than Drive reachability — it covers total
+    network loss, not just Drive being down."""
+    global _wifi_ap_started_by_watchdog
+    while True:
+        try:
+            # Don't fight a connection attempt the user just kicked off.
+            if wifi.get_status()['phase'] != 'connecting':
+                online = wifi.has_internet()
+                if not online and not wifi.is_ap_active():
+                    ok, msg = wifi.start_ap()
+                    _wifi_ap_started_by_watchdog = ok
+                    print(f"WiFi watchdog: no internet, started setup AP: {msg}")
+                elif online and wifi.is_ap_active() and _wifi_ap_started_by_watchdog:
+                    # Came online on its own (e.g. Ethernet plugged back in)
+                    # while the watchdog's own AP was up for no reason now.
+                    ok, msg = wifi.stop_ap()
+                    _wifi_ap_started_by_watchdog = not ok
+        except Exception as exc:
+            print(f"WiFi watchdog error: {exc}")
+        time.sleep(WIFI_CHECK_INTERVAL_SECONDS)
+
+
+@application.route('/wifi', methods=['GET'])
+@login_required
+def wifi_setup():
+    return render_template(
+        'wifi.html',
+        title=settings.APP_TITLE,
+        ap_active=wifi.is_ap_active(),
+        networks=wifi.scan_networks(),
+    )
+
+
+@application.route('/wifi/connect', methods=['POST'])
+@login_required
+def wifi_connect():
+    ssid = request.form.get('ssid', '').strip()
+    password = request.form.get('password', '')
+    if not ssid:
+        return jsonify({"ok": False, "message": "No network selected."}), 400
+    ok, message = wifi.start_connect(ssid, password)
+    return jsonify({"ok": ok, "message": message})
+
+
+@application.route('/wifi/status', methods=['GET'])
+@login_required
+def wifi_status():
+    return jsonify(wifi.get_status())
+
+
 @application.route('/retry', methods=['POST'])
 @login_required
 def retry():
@@ -281,6 +339,7 @@ def drive_status():
 appstate.startup()
 
 threading.Thread(target=_periodic_reconnect_loop, daemon=True).start()
+threading.Thread(target=_wifi_watchdog_loop, daemon=True).start()
 
 
 if __name__ == "__main__":
