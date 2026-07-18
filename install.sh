@@ -108,13 +108,20 @@ if [ $? -ne 0 ]; then
 fi
 
 # --- Service Management ---
-echo "Enabling and starting the service..."
+echo "Reloading systemd unit files..."
+sudo systemctl daemon-reload
+if [ $? -ne 0 ]; then
+  echo "Error: Failed to reload systemd units. Installation incomplete."
+  exit 1
+fi
+
+echo "Enabling and restarting the service..."
 sudo systemctl enable "$SERVICE_NAME"
 if [ $? -ne 0 ]; then
   echo "Error: Failed to enable the service. Installation incomplete."
   exit 1
 fi
-sudo systemctl start "$SERVICE_NAME"
+sudo systemctl restart "$SERVICE_NAME"
 if [ $? -ne 0 ]; then
   echo "Error: Failed to start the service. Installation incomplete."
   exit 1

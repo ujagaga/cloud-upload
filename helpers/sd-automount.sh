@@ -25,18 +25,21 @@ case "$ACTION" in
   add)
     FSTYPE="$(blkid -s TYPE -o value "$DEVICE" 2>/dev/null || true)"
     mkdir -p "$MOUNT_POINT"
+    # systemd-udevd's seccomp filter blocks the mount(2) syscall directly, so
+    # RUN+= scripts must ask systemd itself to mount (via a transient unit)
+    # instead of calling mount/umount.
     case "$FSTYPE" in
       vfat|exfat)
-        mount -o "uid=${UID_NUM},gid=${GID_NUM},umask=000" "$DEVICE" "$MOUNT_POINT"
+        systemd-mount --no-block -o "uid=${UID_NUM},gid=${GID_NUM},umask=000" "$DEVICE" "$MOUNT_POINT"
         ;;
       *)
-        mount "$DEVICE" "$MOUNT_POINT"
+        systemd-mount --no-block "$DEVICE" "$MOUNT_POINT"
         chown "${UID_NUM}:${GID_NUM}" "$MOUNT_POINT"
         ;;
     esac
     ;;
   remove)
-    umount "$MOUNT_POINT" 2>/dev/null || true
+    systemd-umount "$MOUNT_POINT" 2>/dev/null || true
     rmdir "$MOUNT_POINT" 2>/dev/null || true
     ;;
   *)
