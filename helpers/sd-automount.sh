@@ -39,8 +39,15 @@ case "$ACTION" in
     esac
     ;;
   remove)
-    systemd-umount "$MOUNT_POINT" 2>/dev/null || true
-    rmdir "$MOUNT_POINT" 2>/dev/null || true
+    # A udev "remove" event (device physically pulled) often finds the mount
+    # already gone — that's still success. Only a mountpoint that's still
+    # actually mounted after the attempt counts as a real failure.
+    if systemd-umount "$MOUNT_POINT" 2>/dev/null || ! mountpoint -q "$MOUNT_POINT" 2>/dev/null; then
+      rmdir "$MOUNT_POINT" 2>/dev/null || true
+    else
+      echo "Failed to unmount $MOUNT_POINT" >&2
+      exit 1
+    fi
     ;;
   *)
     echo "Usage: $0 add|remove <devname>" >&2

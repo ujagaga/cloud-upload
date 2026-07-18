@@ -68,10 +68,17 @@ def unmount_sd():
 
     mountpoint = _mountpoint_of(images[0]) or root
     dev = device_of(images[0])
+    devname = os.path.basename(dev) if dev else None
 
+    # Tried in order: udisksctl (works unprivileged on a desktop session, but
+    # isn't installed on a headless box like the Orange Pi); the same
+    # sudoers-granted helper mount_sd() uses (works on a plain systemd
+    # service, no desktop session); plain umount as a last resort.
     cmds = []
     if dev:
         cmds.append(["udisksctl", "unmount", "--no-user-interaction", "-b", dev])
+    if devname:
+        cmds.append(["sudo", "-n", "/usr/local/bin/sd-automount.sh", "remove", devname])
     cmds.append(["umount", mountpoint])
 
     for cmd in cmds:
