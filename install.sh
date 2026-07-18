@@ -58,6 +58,7 @@ StartLimitIntervalSec=0
 [Service]
 Type=simple
 User=$USER
+AmbientCapabilities=CAP_NET_BIND_SERVICE
 ExecStart=$PWD/run_server.sh
 WorkingDirectory=$PWD
 Restart=on-failure

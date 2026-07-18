@@ -202,4 +202,4 @@ appstate.startup()
 
 
 if __name__ == "__main__":
-    application.run(debug=True, use_reloader=True, port=8010)
+    application.run(debug=True, use_reloader=True, port=8000)
