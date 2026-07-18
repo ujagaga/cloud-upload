@@ -58,16 +58,24 @@ def _mountpoint_of(path):
         return None
 
 
-def unmount_sd():
-    """Flush and unmount the SD card if present. Returns (ok, message)."""
-    root, images = sdcard.find_card()
-    if not root:
-        return True, "No SD card mounted."
+def unmount_sd(hint_path=None):
+    """Flush and unmount the SD card if present. Returns (ok, message).
+
+    hint_path (optional): a directory already known to be on the card, used
+    when sdcard.find_card() can't locate it by scanning for images — e.g.
+    right after a delete-after-upload run removed every file, leaving
+    nothing to scan for even though the mount itself is still there."""
+    if hint_path and os.path.isdir(hint_path):
+        mountpoint = _mountpoint_of(hint_path) or hint_path
+        dev = device_of(hint_path)
+    else:
+        root, images = sdcard.find_card()
+        if not root:
+            return True, "No SD card mounted."
+        mountpoint = _mountpoint_of(images[0]) or root
+        dev = device_of(images[0])
 
     subprocess.run(["sync"], check=False)
-
-    mountpoint = _mountpoint_of(images[0]) or root
-    dev = device_of(images[0])
     devname = os.path.basename(dev) if dev else None
 
     # Tried in order: udisksctl (works unprivileged on a desktop session, but

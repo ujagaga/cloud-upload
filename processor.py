@@ -138,7 +138,11 @@ def _worker(images, folder_name, delete_after):
         all_succeeded = not aborted and not _state["errors"]
 
     if delete_after or all_succeeded:
-        ok, msg = appstate.unmount_sd()
+        # images[0]'s directory, not images[0] itself: delete_after may have
+        # removed every file, but the directory survives, so it still works
+        # as a hint for locating the mount.
+        hint = os.path.dirname(images[0]) if images else None
+        ok, msg = appstate.unmount_sd(hint)
         print(f"Post-upload unmount: {msg}")
 
 
