@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
-  const startBtn = document.getElementById('start_btn');
+  const startStatus = document.getElementById('start_status');
+  const retryBtn = document.getElementById('retry_btn');
   const authArea = document.getElementById('auth_area');
   const doneArea = document.getElementById('done_area');
   const verifyLink = document.getElementById('verify_link');
@@ -11,11 +12,12 @@ document.addEventListener('DOMContentLoaded', function () {
   let polling = null;
 
   function showPending(s) {
+    startStatus.classList.add('hidden');
     authArea.classList.remove('hidden');
     verifyLink.href = s.verification_url;
     verifyLink.textContent = s.verification_url;
     userCode.textContent = s.user_code;
-    authStatus.textContent = 'Waiting for you to authorize on your phone…';
+    authStatus.textContent = 'Waiting for you to authorize…';
   }
 
   function finish(s, cls) {
@@ -25,10 +27,10 @@ document.addEventListener('DOMContentLoaded', function () {
       doneArea.classList.remove('hidden');
       doneMsg.textContent = s.message || 'Authorized.';
     } else {
-      authStatus.textContent = s.message || s.status;
-      authStatus.className = 'err';
-      startBtn.disabled = false;
-      startBtn.textContent = 'Try again';
+      authArea.classList.add('hidden');
+      startStatus.textContent = s.message || s.status;
+      startStatus.className = 'err';
+      retryBtn.classList.remove('hidden');
     }
   }
 
@@ -42,9 +44,11 @@ document.addEventListener('DOMContentLoaded', function () {
       .catch(() => {});
   }
 
-  startBtn.addEventListener('click', function () {
-    startBtn.disabled = true;
-    startBtn.textContent = 'Starting…';
+  function startAuth() {
+    retryBtn.classList.add('hidden');
+    startStatus.classList.remove('hidden');
+    startStatus.className = 'muted';
+    startStatus.textContent = 'Starting authorization…';
     fetch('/authorize/start', {
       method: 'POST',
       headers: { 'X-CSRFToken': csrf },
@@ -52,20 +56,23 @@ document.addEventListener('DOMContentLoaded', function () {
       .then(r => r.json())
       .then(s => {
         if (!s.ok) {
-          authStatus.textContent = s.message;
-          authStatus.className = 'err';
-          startBtn.disabled = false;
-          startBtn.textContent = 'Try again';
+          startStatus.textContent = s.message;
+          startStatus.className = 'err';
+          retryBtn.classList.remove('hidden');
           return;
         }
         showPending(s);
         polling = setInterval(poll, 3000);
       })
       .catch(() => {
-        startBtn.disabled = false;
-        startBtn.textContent = 'Try again';
+        startStatus.textContent = 'Could not reach the server.';
+        startStatus.className = 'err';
+        retryBtn.classList.remove('hidden');
       });
-  });
+  }
+
+  retryBtn.addEventListener('click', startAuth);
+  startAuth();
 
   function copyText(text) {
     // navigator.clipboard needs a secure context; this app is served over

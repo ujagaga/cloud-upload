@@ -4,7 +4,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
 
   <nav class="top_nav">
-    <a href="{{ url_for('index') }}" class="nav_btn" title="Back"><i class="fa-solid fa-arrow-left"></i></a>
+    <a href="{{ url_for('index') }}" class="nav_btn nav_left" title="Back"><i class="fa-solid fa-arrow-left"></i></a>
   </nav>
 
   <h1>Authorize Google Drive</h1>
@@ -12,7 +12,8 @@
   <div class="card">
     <p>Open the link below and enter the code to grant access to your Google Drive.</p>
 
-    <button id="start_btn" class="save_btn">Start authorization</button>
+    <p id="start_status" class="muted">Starting authorization…</p>
+    <button type="button" id="retry_btn" class="save_btn hidden">Retry</button>
 
     <div id="auth_area" class="hidden">
       <p class="muted">1. Open this page on any device:</p>

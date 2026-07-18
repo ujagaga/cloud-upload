@@ -229,7 +229,7 @@ def disconnect_drive():
     except FileNotFoundError:
         pass
     appstate.retry()
-    return redirect(url_for('authorize'))
+    return redirect(url_for('index'))
 
 
 # ---------------------- On-device Google authorization ----------------------
