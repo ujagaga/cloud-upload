@@ -7,7 +7,10 @@
     <h1>{{ title }}</h1>
     <form method="POST" action="{{ url_for('login') }}" class="signin_form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="password" name="password" placeholder="Password" autofocus required>
+        <div class="password_row">
+            <input type="password" id="password" name="password" placeholder="Password" autofocus required>
+            <button type="button" class="toggle_pw" data-target="password" title="Show password"><i class="fa-solid fa-eye"></i></button>
+        </div>
         <button type="submit" class="save_btn">Sign in</button>
     </form>
     {% with messages = get_flashed_messages() %}
@@ -18,4 +21,5 @@
         {% endif %}
     {% endwith %}
 </div>
+<script src="{{ url_for('static', filename='js/config.js') }}"></script>
 {% endblock %}

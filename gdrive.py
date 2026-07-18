@@ -35,6 +35,17 @@ def get_service():
     return build("drive", "v3", credentials=creds, cache_discovery=False)
 
 
+def get_account_email():
+    """Return the linked Drive account's email, or None if unavailable."""
+    try:
+        service = get_service()
+        about = service.about().get(fields="user").execute()
+        return about.get("user", {}).get("emailAddress")
+    except Exception as exc:
+        print(f"Could not fetch Drive account info: {exc}")
+        return None
+
+
 def check_access() -> bool:
     """True if Drive is reachable and usable (creds valid, API responds)."""
     try:

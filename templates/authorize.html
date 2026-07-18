@@ -10,8 +10,7 @@
   <h1>Authorize Google Drive</h1>
 
   <div class="card">
-    <p>On your phone, open the link below and enter the code to grant this device
-       access to your Google Drive.</p>
+    <p>Open the link below and enter the code to grant access to your Google Drive.</p>
 
     <button id="start_btn" class="save_btn">Start authorization</button>
 
@@ -19,7 +18,10 @@
       <p class="muted">1. Open this page on any device:</p>
       <p><a id="verify_link" href="#" target="_blank" rel="noopener"></a></p>
       <p class="muted">2. Enter this code:</p>
-      <p class="code_big" id="user_code"></p>
+      <div class="code_row">
+        <p class="code_big" id="user_code"></p>
+        <button type="button" id="copy_code_btn" class="nav_btn" title="Copy code"><i class="fa-solid fa-copy"></i></button>
+      </div>
       <p id="auth_status"></p>
     </div>
 

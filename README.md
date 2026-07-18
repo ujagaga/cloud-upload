@@ -135,6 +135,10 @@ server/
   templates/ static/  web UI
   install.sh          dependency install + systemd service
   run_server.sh       start gunicorn
+  helpers/
+    sd-automount.sh          mount an SD card partition under /media on insert
+                             (uses systemd-mount, not raw mount — see below)
+    99-sdcard-automount.rules  udev rule invoking sd-automount.sh on add/remove
 ```
 
 ## Notes and limitations
@@ -144,6 +148,16 @@ server/
 - Unmounting the SD card uses `udisksctl` (falls back to `umount`). This works
   without root for auto-mounted removable media; other mount setups may need a
   sudoers rule.
+- **SD card automount:** `install.sh` installs `helpers/sd-automount.sh` to
+  `/usr/local/bin` and `helpers/99-sdcard-automount.rules` to
+  `/etc/udev/rules.d`, so inserting an SD card mounts it under
+  `/media/<label-or-devname>` (matching `sdcard.py`'s `SD_SCAN_PATHS`) even on
+  a headless box with no desktop session. It mounts via `systemd-mount` rather
+  than the plain `mount` command — `systemd-udevd`'s seccomp filter blocks the
+  `mount(2)` syscall for scripts it runs directly, so a raw `mount` call fails
+  silently. The mount owner/group is read from `/etc/sd-automount.conf`
+  (`MOUNT_USER=...`, written by `install.sh` with the user running the
+  service).
 - On startup the app makes a live Drive API call to decide active vs. idle; on a
   dead link it waits for the HTTP timeout before falling back to idle.
 - The refresh token in `token.json` is read fresh at each boot. If Google ever

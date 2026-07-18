@@ -8,6 +8,21 @@ import gdrive
 _lock = threading.Lock()
 _thread = None
 
+# Files (path, size, mtime) already uploaded or confirmed-on-Drive during this
+# process's lifetime. RAM only, by design: a restart is allowed to forget it
+# and fall back to Drive's own skip check, but while the process is up this
+# stops a still-inserted card from re-running (and clobbering the last
+# summary) every time auto-upload retriggers.
+_handled_files = set()
+
+
+def _fingerprint(path):
+    try:
+        st = os.stat(path)
+        return (path, st.st_size, st.st_mtime)
+    except OSError:
+        return (path, None, None)
+
 _state = {
     "running": False,
     "total": 0,
@@ -85,6 +100,10 @@ def _worker(images, folder_name, delete_after):
                 with _lock:
                     _state["done"] += 1
 
+            if confirmed:
+                with _lock:
+                    _handled_files.add(_fingerprint(src))
+
             # Only remove from the card once the file is confirmed on Drive.
             if confirmed and delete_after:
                 try:
@@ -130,12 +149,17 @@ def start(delete_after=False):
     if not images:
         return False, "No SD card with images found."
 
+    with _lock:
+        pending = [p for p in images if _fingerprint(p) not in _handled_files]
+    if not pending:
+        return False, "All images from this card were already uploaded this session."
+
     folder_name = sdcard.derive_folder_name(images)
 
     with _lock:
-        _reset(len(images), folder_name,
-                message=f"Uploading {len(images)} images from {root} to folder '{folder_name}'.")
+        _reset(len(pending), folder_name,
+                message=f"Uploading {len(pending)} images from {root} to folder '{folder_name}'.")
 
-    _thread = threading.Thread(target=_worker, args=(images, folder_name, delete_after), daemon=True)
+    _thread = threading.Thread(target=_worker, args=(pending, folder_name, delete_after), daemon=True)
     _thread.start()
-    return True, f"Started uploading {len(images)} images to '{folder_name}'."
+    return True, f"Started uploading {len(pending)} images to '{folder_name}'."

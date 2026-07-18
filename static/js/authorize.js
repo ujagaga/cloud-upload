@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const userCode = document.getElementById('user_code');
   const authStatus = document.getElementById('auth_status');
   const doneMsg = document.getElementById('done_msg');
+  const copyCodeBtn = document.getElementById('copy_code_btn');
 
   let polling = null;
 
@@ -64,5 +65,34 @@ document.addEventListener('DOMContentLoaded', function () {
         startBtn.disabled = false;
         startBtn.textContent = 'Try again';
       });
+  });
+
+  function copyText(text) {
+    // navigator.clipboard needs a secure context; this app is served over
+    // plain HTTP on the LAN, so fall back to the classic selection copy.
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text);
+    }
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try {
+      document.execCommand('copy');
+    } finally {
+      document.body.removeChild(ta);
+    }
+    return Promise.resolve();
+  }
+
+  copyCodeBtn.addEventListener('click', function () {
+    copyText(userCode.textContent).then(function () {
+      const icon = copyCodeBtn.querySelector('i');
+      icon.className = 'fa-solid fa-check';
+      setTimeout(function () { icon.className = 'fa-solid fa-copy'; }, 1500);
+    });
   });
 });

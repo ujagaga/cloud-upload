@@ -9,6 +9,7 @@ import gdrive
 DEFAULTS = {
     "password_hash": None,
     "delete_after_upload": False,
+    "auto_upload": True,
 }
 
 _data = dict(DEFAULTS)

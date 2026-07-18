@@ -81,22 +81,35 @@ def change_password():
 
     if not new:
         flash("New password cannot be empty.")
-        return redirect(url_for('index'))
+        return redirect(url_for('config'))
 
     if not appstate.is_active():
         flash("Cannot save: Google Drive not reachable.")
-        return redirect(url_for('index'))
+        return redirect(url_for('config'))
 
     if not helper.verify_password(current):
         flash("Current password is wrong.")
-        return redirect(url_for('index'))
+        return redirect(url_for('config'))
 
     try:
         helper.set_password(new)
         flash("Password changed.")
     except Exception as exc:
         flash(f"Could not save password to Drive: {exc}")
-    return redirect(url_for('index'))
+    return redirect(url_for('config'))
+
+
+@application.route('/config', methods=['GET'])
+@login_required
+def config():
+    return render_template(
+        'config.html',
+        title=settings.APP_TITLE,
+        delete_after=bool(store.get('delete_after_upload')),
+        auto_upload=bool(store.get('auto_upload')),
+        drive_authorized=gdrive.is_authorized(),
+        drive_email=gdrive.get_account_email() if gdrive.is_authorized() else None,
+    )
 
 
 # ---------------------- Main UI ----------------------
@@ -110,7 +123,7 @@ def index():
         idle_reason=appstate.get_reason(),
         drive_authorized=gdrive.is_authorized(),
         drive_folder=settings.DRIVE_FOLDER_NAME,
-        delete_after=bool(store.get('delete_after_upload')),
+        auto_upload=bool(store.get('auto_upload')),
     ))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     return resp
@@ -130,13 +143,14 @@ def scan():
 def save_settings():
     if not appstate.is_active():
         flash("Cannot save: Google Drive not reachable.")
-        return redirect(url_for('index'))
+        return redirect(url_for('config'))
     try:
         store.set('delete_after_upload', bool(request.form.get('delete_after_upload')))
+        store.set('auto_upload', bool(request.form.get('auto_upload')))
         flash("Settings saved.")
     except Exception as exc:
         flash(f"Could not save settings to Drive: {exc}")
-    return redirect(url_for('index'))
+    return redirect(url_for('config'))
 
 
 @application.route('/start', methods=['POST'])
@@ -195,6 +209,12 @@ def authorize_token():
 @login_required
 def status():
     return jsonify(processor.get_status())
+
+
+@application.route('/drive_status', methods=['GET'])
+@login_required
+def drive_status():
+    return jsonify({"authorized": gdrive.is_authorized()})
 
 
 # Decide active/idle at worker startup (single gunicorn worker holds this state).

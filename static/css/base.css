@@ -117,6 +117,8 @@ h1 {
 .save_btn,
 .delete_btn,
 .restart_btn {
+  display: inline-block;
+  box-sizing: border-box;
   color: #fff;
   border: none;
   padding: 0.6em 1em;

@@ -4,6 +4,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
 
   <nav class="top_nav">
+    <a href="{{ url_for('config') }}" class="nav_btn nav_left" title="Config"><i class="fa-solid fa-gear"></i></a>
     <a href="{{ url_for('logout') }}" class="nav_btn" title="Log out"><i class="fa-solid fa-right-from-bracket"></i></a>
   </nav>
 
@@ -24,12 +25,14 @@
         {% if not drive_authorized %}
           <a href="{{ url_for('authorize') }}" class="save_btn">Authorize Google Drive</a>
         {% endif %}
-        <form method="POST" action="{{ url_for('retry') }}">
+        <form method="POST" action="{{ url_for('retry') }}" id="retry_form" class="{% if not drive_authorized %}hidden{% endif %}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="save_btn" style="width:100%">Retry Google Drive</button>
         </form>
       </div>
     </div>
+
+    <script src="{{ url_for('static', filename='js/idle_status.js') }}"></script>
   {% else %}
     <div class="card">
       <h2>Google Drive</h2>
@@ -40,15 +43,7 @@
       <h2>SD card</h2>
       <p id="card_status">Scanning…</p>
 
-      <form method="POST" action="{{ url_for('save_settings') }}" class="option_form">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label class="checkbox_row">
-          <input type="checkbox" name="delete_after_upload" onchange="this.form.submit()" {% if delete_after %}checked{% endif %}>
-          Delete files from SD card after successful upload
-        </label>
-      </form>
-
-      <form method="POST" action="{{ url_for('start') }}" id="start_form">
+      <form method="POST" action="{{ url_for('start') }}" id="start_form" class="{% if auto_upload %}hidden{% endif %}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="save_btn" id="start_btn" disabled>Upload all</button>
       </form>
@@ -65,16 +60,10 @@
       </div>
     </div>
 
-    <div class="card">
-      <h2>Change password</h2>
-      <form method="POST" action="{{ url_for('change_password') }}" class="update_buttons">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="password" name="current_password" placeholder="Current password" required>
-        <input type="password" name="new_password" placeholder="New password" required>
-        <button type="submit" class="save_btn">Update password</button>
-      </form>
-    </div>
-
+    <script>
+      const AUTO_UPLOAD = {{ 'true' if auto_upload else 'false' }};
+      const CSRF_TOKEN = "{{ csrf_token() }}";
+    </script>
     <script src="{{ url_for('static', filename='js/home.js') }}"></script>
   {% endif %}
 {% endblock %}

@@ -10,6 +10,15 @@ document.addEventListener('DOMContentLoaded', function () {
   const errorList = document.getElementById('error_list');
 
   let polling = null;
+  let autoUploadedRoot = null;
+
+  function triggerAutoUpload() {
+    fetch('/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'csrf_token=' + encodeURIComponent(CSRF_TOKEN),
+    }).then(() => setTimeout(startPolling, 500));
+  }
 
   function scanCard() {
     fetch('/scan')
@@ -18,9 +27,14 @@ document.addEventListener('DOMContentLoaded', function () {
         if (data.found) {
           cardStatus.textContent = `Found ${data.count} image(s) at ${data.root}.`;
           startBtn.disabled = false;
+          if (AUTO_UPLOAD && data.root !== autoUploadedRoot) {
+            autoUploadedRoot = data.root;
+            triggerAutoUpload();
+          }
         } else {
           cardStatus.textContent = 'No SD card with images found.';
           startBtn.disabled = true;
+          autoUploadedRoot = null;
         }
       })
       .catch(() => { cardStatus.textContent = 'Could not scan for SD card.'; });
@@ -78,6 +92,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   scanCard();
+  setInterval(scanCard, 3000);
   // If a run is already in progress (e.g. page reloaded), pick it up.
   fetch('/status').then(r => r.json()).then(s => {
     if (s.running) { renderStatus(s); startPolling(); }

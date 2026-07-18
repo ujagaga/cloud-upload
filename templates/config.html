@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+
+  <nav class="top_nav">
+    <a href="{{ url_for('index') }}" class="nav_btn nav_left" title="Back"><i class="fa-solid fa-arrow-left"></i></a>
+    <a href="{{ url_for('logout') }}" class="nav_btn" title="Log out"><i class="fa-solid fa-right-from-bracket"></i></a>
+  </nav>
+
+  <h1>Config</h1>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <p class="notification">{{ messages[0] }}</p>
+    {% endif %}
+  {% endwith %}
+
+  <div class="card">
+    <h2>Google Drive account</h2>
+    {% if drive_authorized %}
+      <p>Linked to <b>{{ drive_email or 'unknown account' }}</b>.</p>
+    {% else %}
+      <p class="muted">Not connected.</p>
+    {% endif %}
+    <a href="{{ url_for('authorize') }}" class="save_btn">{{ 'Change account' if drive_authorized else 'Authorize Google Drive' }}</a>
+  </div>
+
+  <div class="card">
+    <h2>Upload options</h2>
+    <form method="POST" action="{{ url_for('save_settings') }}" class="option_form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="checkbox_row">
+        <span class="switch">
+          <input type="checkbox" name="delete_after_upload" onchange="this.form.submit()" {% if delete_after %}checked{% endif %}>
+          <span class="switch_slider"></span>
+        </span>
+        Delete files from SD card after successful upload
+      </label>
+      <label class="checkbox_row">
+        <span class="switch">
+          <input type="checkbox" name="auto_upload" onchange="this.form.submit()" {% if auto_upload %}checked{% endif %}>
+          <span class="switch_slider"></span>
+        </span>
+        Automatically upload when an SD card is inserted
+      </label>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Change password</h2>
+    <form method="POST" action="{{ url_for('change_password') }}" class="update_buttons">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="password_row">
+        <input type="password" id="current_password" name="current_password" placeholder="Current password" required>
+        <button type="button" class="toggle_pw" data-target="current_password" title="Show password"><i class="fa-solid fa-eye"></i></button>
+      </div>
+      <div class="password_row">
+        <input type="password" id="new_password" name="new_password" placeholder="New password" required>
+        <button type="button" class="toggle_pw" data-target="new_password" title="Show password"><i class="fa-solid fa-eye"></i></button>
+      </div>
+      <button type="submit" class="save_btn">Update password</button>
+    </form>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/config.js') }}"></script>
+{% endblock %}

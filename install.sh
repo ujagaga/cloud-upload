@@ -81,7 +81,7 @@ fi
 echo "Creating systemd service file: $SERVICE_FILE"
 cat <<EOF > "$PWD/$SERVICE_NAME"
 [Unit]
-Description=Image Upload Server
+Description=Image Uploader
 After=network-online.target
 Wants=network-online.target
 StartLimitIntervalSec=0
@@ -127,6 +127,6 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-echo "Image Upload Server installation and service started successfully!"
+echo "Image Uploader installation and service started successfully!"
 
 exit 0
