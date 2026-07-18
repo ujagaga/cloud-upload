@@ -44,6 +44,19 @@ def has_internet(timeout=3) -> bool:
         return False
 
 
+def _wlan0_connected() -> bool:
+    """True once wlan0 itself has a real (non-link-local) IPv4 address —
+    checked instead of generic internet reachability, because this device
+    may also have Ethernet, which would make a generic check succeed
+    regardless of whether the wlan0 connection attempt itself worked."""
+    try:
+        r = subprocess.run(["ip", "-4", "-o", "addr", "show", "wlan0"],
+                            capture_output=True, text=True, timeout=5)
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
+    return " inet " in r.stdout and "169.254." not in r.stdout
+
+
 def is_ap_active() -> bool:
     try:
         r = subprocess.run(
@@ -167,7 +180,7 @@ def _connect_worker(ssid, password, timeout):
 
     deadline = time.time() + timeout
     while time.time() < deadline:
-        if has_internet(timeout=3):
+        if _wlan0_connected():
             # So the device can be found at a fixed hostname afterward
             # instead of hunting for whatever IP this network handed out.
             subprocess.run(["sudo", "-n", "resolvectl", "mdns", "wlan0", "yes"],
