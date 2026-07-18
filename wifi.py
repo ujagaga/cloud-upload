@@ -83,6 +83,8 @@ def _live_scan():
                 signal = None
         elif line.startswith("SSID:"):
             ssid = line.split(":", 1)[1].strip()
+        elif line.startswith("capability:") and "Privacy" in line:
+            secured = True
         elif line.startswith("RSN:") or line.startswith("WPA:"):
             secured = True
 
