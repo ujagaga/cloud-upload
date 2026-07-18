@@ -8,6 +8,10 @@ document.addEventListener('DOMContentLoaded', function () {
   const transferredCount = document.getElementById('transferred_count');
   const transferredList = document.getElementById('transferred_list');
   const errorList = document.getElementById('error_list');
+  const mountStatus = document.getElementById('mount_status');
+  const mountIcon = document.getElementById('mount_icon');
+  const mountStatusText = document.getElementById('mount_status_text');
+  const mountBtn = document.getElementById('mount_btn');
 
   let polling = null;
   let autoUploadedRoot = null;
@@ -20,10 +24,33 @@ document.addEventListener('DOMContentLoaded', function () {
     }).then(() => setTimeout(startPolling, 500));
   }
 
+  function deviceName(device) {
+    return device ? device.split('/').pop() : '';
+  }
+
+  function setMountStatus(mounted, device) {
+    const suffix = device ? ` (${deviceName(device)})` : '';
+    if (mounted) {
+      mountStatus.classList.remove('hidden');
+      mountIcon.className = 'fa-solid fa-sd-card ok';
+      mountStatusText.textContent = `Mounted${suffix}`;
+      mountBtn.classList.add('hidden');
+    } else if (device) {
+      mountStatus.classList.remove('hidden');
+      mountIcon.className = 'fa-solid fa-sd-card err';
+      mountStatusText.textContent = `Not mounted${suffix}`;
+      mountBtn.classList.remove('hidden');
+      mountBtn.dataset.device = device;
+    } else {
+      mountStatus.classList.add('hidden');
+    }
+  }
+
   function scanCard() {
     fetch('/scan')
       .then(r => r.json())
       .then(data => {
+        setMountStatus(data.mounted, data.device);
         if (data.found) {
           cardStatus.textContent = `Found ${data.count} image(s) at ${data.root}.`;
           startBtn.disabled = false;
@@ -39,6 +66,26 @@ document.addEventListener('DOMContentLoaded', function () {
       })
       .catch(() => { cardStatus.textContent = 'Could not scan for SD card.'; });
   }
+
+  mountBtn.addEventListener('click', function () {
+    mountBtn.disabled = true;
+    mountBtn.textContent = 'Mounting…';
+    fetch('/mount_card', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'csrf_token=' + encodeURIComponent(CSRF_TOKEN) + '&device=' + encodeURIComponent(mountBtn.dataset.device || ''),
+    })
+      .then(r => r.json())
+      .then(() => {
+        mountBtn.disabled = false;
+        mountBtn.innerHTML = '<i class="fa-solid fa-plug"></i> Mount';
+        scanCard();
+      })
+      .catch(() => {
+        mountBtn.disabled = false;
+        mountBtn.innerHTML = '<i class="fa-solid fa-plug"></i> Mount';
+      });
+  });
 
   function renderStatus(s) {
     progressWrap.classList.remove('hidden');

@@ -20,8 +20,9 @@ It is built for unstable travel conditions — flaky internet and unreliable pow
    - **Reachable** → *active* mode; settings are loaded from Drive.
    - **Not reachable** → *idle* mode; the SD card is unmounted and the UI shows
      the reason plus a **Retry** button.
-2. In active mode, insert an SD card and press **Upload all**. Every image on
-   the card is uploaded to a per-card folder in Drive.
+2. In active mode, insert an SD card and press **Upload all** — or turn on
+   **auto-upload** in Config to start automatically as soon as a card with
+   images is detected, no button press needed.
 3. Files already uploaded are detected and skipped, so an interrupted upload can
    be resumed safely (even the next day).
 
@@ -35,9 +36,18 @@ It is built for unstable travel conditions — flaky internet and unreliable pow
 - **Skip already-uploaded:** the app lists the target folder on Drive and skips a
   file when both its name and MD5 checksum already match. The source of truth is
   Drive itself, so this works with no local state across reboots.
-- **Delete after upload** (optional, off by default): when enabled, each file is
-  removed from the SD card once it is confirmed on Drive. Files that fail to
-  upload are never deleted.
+- **Auto-upload** (Config page, on by default): starts a run automatically the
+  moment a card with images is detected, and hides the **Upload all** button
+  while it's on. The app also remembers (in memory only, for as long as the
+  process keeps running) which files it already handled this session, so a
+  still-inserted card doesn't repeatedly restart a finished run — e.g. after
+  navigating between pages. That memory is intentionally lost on a restart;
+  Drive's own skip check is the permanent source of truth.
+- **Delete after upload** (Config page, off by default): when enabled, each
+  file is removed from the SD card once it is confirmed on Drive. Files that
+  fail to upload are never deleted. Once a run finishes with this on, the app
+  also unmounts the card, same as it does in idle mode, so an unexpected power
+  cut afterward can't corrupt its file system.
 
 ### Access control
 
@@ -47,6 +57,16 @@ Single user, protected by a password.
 - The password you set is stored (hashed) in Drive, so it survives reboots.
 - `MASTER_PASSWORD` in `settings.py` is a recovery override that always works,
   including in idle mode. It is never stored and never changes through the UI.
+
+### Config page
+
+Reached via the gear icon on the home page:
+
+- **Google Drive account** — shows the linked account's email, with a button
+  to disconnect it (deletes `token.json` and sends you to the authorize page
+  to link a different account).
+- **Upload options** — the auto-upload and delete-after-upload toggles above.
+- **Change password** — with a show/hide button on each field.
 
 ## Setup
 
@@ -63,7 +83,7 @@ There are two ways to obtain the `token.json` credential.
 no browser or cable needed on the device.
 
 1. Create an **OAuth client ID** of type **TVs and Limited Input devices** and
-   download it as `client_secret.json` into `server/`.
+   download it as `client_secret.json` into the app directory.
 2. Open the app, go to **Authorize Google Drive**, press **Start**. It shows a
    short code and a link.
 3. On your phone, open the link, sign in, and enter the code. The device picks up
@@ -83,12 +103,11 @@ download to copy onto the flash yourself.
    python3 authorize_drive.py
    ```
    Grant access. This writes `token.json`.
-3. Copy `client_secret.json` and `token.json` into `server/` on the device.
+3. Copy `client_secret.json` and `token.json` into the app directory on the device.
 
 ### 2. Configuration
 
 ```bash
-cd server
 cp settings.py.example settings.py
 ```
 
@@ -105,7 +124,6 @@ Edit `settings.py` and set at least:
 ### 3. Install and run
 
 ```bash
-cd server
 ./install.sh
 ```
 
@@ -113,32 +131,33 @@ This installs dependencies into a virtualenv and sets up a systemd service that
 starts the server on boot. To run it by hand instead:
 
 ```bash
-./run_server.sh          # gunicorn on port 8010
+./run_server.sh          # gunicorn on port 80
 ```
 
-Then open `http://<device-ip>:8010` from your phone.
+Then open `http://<device-ip>` from your phone. Port 80 needs
+`CAP_NET_BIND_SERVICE`; `install.sh`'s systemd unit grants it via
+`AmbientCapabilities` so the service doesn't need to run as root.
 
 ## Project layout
 
 ```
-server/
-  index.py            Flask app: routes, auth, mode gating
-  appstate.py         active/idle mode, Drive reachability, SD unmount, flash persist
-  store.py            durable settings, persisted to Drive as JSON
-  gdrive.py           Google Drive: auth, folders, upload, dedup, JSON I/O
-  deviceauth.py       on-device Google authorization (OAuth device flow)
-  sdcard.py           detect the SD card, list images, derive folder name
-  processor.py        background worker: scan → upload → (optional) delete
-  helper.py           password verify/set
-  authorize_drive.py  alternative one-time OAuth helper (run on a laptop)
-  settings.py         configuration (not committed)
-  templates/ static/  web UI
-  install.sh          dependency install + systemd service
-  run_server.sh       start gunicorn
-  helpers/
-    sd-automount.sh          mount an SD card partition under /media on insert
-                             (uses systemd-mount, not raw mount — see below)
-    99-sdcard-automount.rules  udev rule invoking sd-automount.sh on add/remove
+index.py            Flask app: routes, auth, mode gating
+appstate.py         active/idle mode, Drive reachability, SD mount/unmount, flash persist
+store.py            durable settings, persisted to Drive as JSON
+gdrive.py           Google Drive: auth, account info, folders, upload, dedup, JSON I/O
+deviceauth.py       on-device Google authorization (OAuth device flow)
+sdcard.py           detect the SD card (mounted and unmounted), list images, derive folder name
+processor.py        background worker: scan → upload → (optional) delete → (optional) unmount
+helper.py           password verify/set
+authorize_drive.py  alternative one-time OAuth helper (run on a laptop)
+settings.py         configuration (not committed)
+templates/ static/  web UI (home, config, authorize, sign-in pages)
+install.sh          dependency install + systemd service + SD automount + sudoers rule
+run_server.sh       start gunicorn
+helpers/
+  sd-automount.sh          mount an SD card partition under /media on insert or on
+                           demand (uses systemd-mount, not raw mount — see below)
+  99-sdcard-automount.rules  udev rule invoking sd-automount.sh on add/remove
 ```
 
 ## Notes and limitations
@@ -158,6 +177,13 @@ server/
   silently. The mount owner/group is read from `/etc/sd-automount.conf`
   (`MOUNT_USER=...`, written by `install.sh` with the user running the
   service).
+- **Manual mount button:** the home page shows the SD card's mount status
+  (device name included) and, if a card is plugged in but not mounted, a
+  **Mount** button that calls the same `sd-automount.sh` helper as the udev
+  rule. This needs `install.sh`'s narrowly-scoped `NOPASSWD` sudoers rule
+  (`/etc/sudoers.d/sd-automount`, one exact command only) so the app's own
+  service user can run it as root; re-run `install.sh` after upgrading if the
+  button doesn't work.
 - On startup the app makes a live Drive API call to decide active vs. idle; on a
   dead link it waits for the HTTP timeout before falling back to idle.
 - The refresh token in `token.json` is read fresh at each boot. If Google ever

@@ -31,10 +31,26 @@ def is_active():
     return _mode == MODE_ACTIVE
 
 
-def _device_of(mountpoint):
+def device_of(path):
+    """Device backing the filesystem that path lives on. --target resolves
+    any path within a mount (not just its exact mountpoint), since sdcard's
+    scan root can be a parent directory one level above the real mount."""
     try:
         out = subprocess.run(
-            ["findmnt", "-no", "SOURCE", mountpoint],
+            ["findmnt", "--target", path, "-no", "SOURCE"],
+            capture_output=True, text=True,
+        )
+        return out.stdout.strip() or None
+    except FileNotFoundError:
+        return None
+
+
+def _mountpoint_of(path):
+    """Real mountpoint that path lives on (may differ from sdcard's scan
+    root, which can be a parent directory one level above the real mount)."""
+    try:
+        out = subprocess.run(
+            ["findmnt", "--target", path, "-no", "TARGET"],
             capture_output=True, text=True,
         )
         return out.stdout.strip() or None
@@ -44,27 +60,48 @@ def _device_of(mountpoint):
 
 def unmount_sd():
     """Flush and unmount the SD card if present. Returns (ok, message)."""
-    root, _ = sdcard.find_card()
+    root, images = sdcard.find_card()
     if not root:
         return True, "No SD card mounted."
 
     subprocess.run(["sync"], check=False)
 
+    mountpoint = _mountpoint_of(images[0]) or root
+    dev = device_of(images[0])
+
     cmds = []
-    dev = _device_of(root)
     if dev:
         cmds.append(["udisksctl", "unmount", "--no-user-interaction", "-b", dev])
-    cmds.append(["umount", root])
+    cmds.append(["umount", mountpoint])
 
     for cmd in cmds:
         try:
             r = subprocess.run(cmd, capture_output=True, text=True)
             if r.returncode == 0:
-                return True, f"Unmounted {root}."
+                return True, f"Unmounted {mountpoint}."
         except FileNotFoundError:
             continue
 
-    return False, f"Failed to unmount {root}."
+    return False, f"Failed to unmount {mountpoint}."
+
+
+def mount_sd(devname):
+    """Mount an SD card partition by kernel name (e.g. mmcblk0p1) via the same
+    helper the udev automount rule uses. Returns (ok, message). Needs the
+    sudoers rule install.sh sets up for this exact command."""
+    if not devname:
+        return False, "No unmounted card detected."
+    try:
+        r = subprocess.run(
+            ["sudo", "-n", "/usr/local/bin/sd-automount.sh", "add", devname],
+            capture_output=True, text=True,
+        )
+    except FileNotFoundError:
+        return False, "Automount helper not installed. Run install.sh."
+
+    if r.returncode == 0:
+        return True, f"Mounted {devname}."
+    return False, r.stderr.strip() or f"Failed to mount {devname}."
 
 
 def persist_token_to_flash():

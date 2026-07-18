@@ -4,6 +4,7 @@ import threading
 import settings
 import sdcard
 import gdrive
+import appstate
 
 _lock = threading.Lock()
 _thread = None
@@ -67,6 +68,7 @@ def _reset(total, folder, message=""):
 
 
 def _worker(images, folder_name, delete_after):
+    aborted = False
     try:
         service = gdrive.get_service()
         root_id = gdrive.ensure_folder(service, settings.DRIVE_FOLDER_NAME)
@@ -123,6 +125,7 @@ def _worker(images, folder_name, delete_after):
             )
     except Exception as exc:
         print(f"Upload aborted: {exc}")
+        aborted = True
         with _lock:
             _state["message"] = f"Aborted: {exc}"
     finally:
@@ -130,6 +133,13 @@ def _worker(images, folder_name, delete_after):
             _state["running"] = False
             _state["current"] = ""
             _state["finished"] = True
+
+    with _lock:
+        all_succeeded = not aborted and not _state["errors"]
+
+    if delete_after or all_succeeded:
+        ok, msg = appstate.unmount_sd()
+        print(f"Post-upload unmount: {msg}")
 
 
 def start(delete_after=False):

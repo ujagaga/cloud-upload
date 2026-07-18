@@ -19,11 +19,20 @@
   <div class="card">
     <h2>Google Drive account</h2>
     {% if drive_authorized %}
-      <p>Linked to <b>{{ drive_email or 'unknown account' }}</b>.</p>
+      <div class="account_row">
+        <form method="POST" action="{{ url_for('disconnect_drive') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="delete_btn" title="Disconnect Google Drive"
+                  onclick="return confirm('Disconnect this Google account? You will need to re-authorize to use Drive uploads again.')">
+            <i class="fa-solid fa-link-slash"></i>
+          </button>
+        </form>
+        <span class="account_email">{{ drive_email or 'unknown account' }}</span>
+      </div>
     {% else %}
       <p class="muted">Not connected.</p>
+      <a href="{{ url_for('authorize') }}" class="save_btn">Authorize Google Drive</a>
     {% endif %}
-    <a href="{{ url_for('authorize') }}" class="save_btn">{{ 'Change account' if drive_authorized else 'Authorize Google Drive' }}</a>
   </div>
 
   <div class="card">

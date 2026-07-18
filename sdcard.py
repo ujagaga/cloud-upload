@@ -1,7 +1,37 @@
 import os
+import glob
 from datetime import datetime
 
 import settings
+
+# Kernel device names the udev automount rule (99-sdcard-automount.rules)
+# reacts to: the onboard reader's mmc partitions, or a USB card reader's.
+CARD_DEV_GLOBS = ["/dev/mmcblk[0-9]p[0-9]", "/dev/sd[a-z][0-9]"]
+
+
+def _mounted_devices():
+    """Device paths currently mounted, per /proc/mounts."""
+    mounted = set()
+    try:
+        with open("/proc/mounts") as f:
+            for line in f:
+                parts = line.split()
+                if parts:
+                    mounted.add(parts[0])
+    except OSError:
+        pass
+    return mounted
+
+
+def find_unmounted_card():
+    """Return the device path of a card partition that's plugged in but not
+    mounted (e.g. /dev/mmcblk0p1), or None if there isn't one."""
+    mounted = _mounted_devices()
+    for pattern in CARD_DEV_GLOBS:
+        for dev in glob.glob(pattern):
+            if dev not in mounted:
+                return dev
+    return None
 
 
 def _candidate_roots():

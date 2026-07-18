@@ -42,6 +42,11 @@
     <div class="card">
       <h2>SD card</h2>
       <p id="card_status">Scanning…</p>
+      <p id="mount_status" class="hidden">
+        <i id="mount_icon" class="fa-solid fa-sd-card"></i>
+        <span id="mount_status_text"></span>
+        <button type="button" id="mount_btn" class="save_btn hidden" title="Mount"><i class="fa-solid fa-plug"></i></button>
+      </p>
 
       <form method="POST" action="{{ url_for('start') }}" id="start_form" class="{% if auto_upload %}hidden{% endif %}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

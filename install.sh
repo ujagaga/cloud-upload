@@ -77,6 +77,17 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+echo "Allowing $USER to run the automount helper as root (for the manual Mount button)..."
+echo "$USER ALL=(root) NOPASSWD: /usr/local/bin/sd-automount.sh" | sudo tee "$PWD/sd-automount-sudoers" > /dev/null
+sudo visudo -cf "$PWD/sd-automount-sudoers"
+if [ $? -ne 0 ]; then
+  echo "Error: Generated sudoers rule failed validation. Aborting installation."
+  rm -f "$PWD/sd-automount-sudoers"
+  exit 1
+fi
+sudo mv "$PWD/sd-automount-sudoers" /etc/sudoers.d/sd-automount
+sudo chmod 440 /etc/sudoers.d/sd-automount
+
 # --- Service File Creation ---
 echo "Creating systemd service file: $SERVICE_FILE"
 cat <<EOF > "$PWD/$SERVICE_NAME"

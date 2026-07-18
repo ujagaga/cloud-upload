@@ -193,9 +193,28 @@ code {
 
 .file_list {
   font-size: 0.9rem;
-  max-height: 200px;
+  max-height: 600px;
   overflow-y: auto;
   padding-left: 1.2rem;
+}
+
+.file_list li {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account_row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.account_email {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 #transferred_box {
