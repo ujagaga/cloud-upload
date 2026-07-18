@@ -46,6 +46,37 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+# --- SD Card Automount Setup ---
+echo "Installing SD card automount script..."
+sudo cp helpers/sd-automount.sh /usr/local/bin/sd-automount.sh
+sudo chmod +x /usr/local/bin/sd-automount.sh
+if [ $? -ne 0 ]; then
+  echo "Error: Failed to install sd-automount.sh. Aborting installation."
+  exit 1
+fi
+
+echo "Writing SD automount config for user $USER..."
+echo "MOUNT_USER=$USER" | sudo tee /etc/sd-automount.conf > /dev/null
+if [ $? -ne 0 ]; then
+  echo "Error: Failed to write /etc/sd-automount.conf. Aborting installation."
+  exit 1
+fi
+
+echo "Installing SD card automount udev rule..."
+sudo cp helpers/99-sdcard-automount.rules /etc/udev/rules.d/99-sdcard-automount.rules
+if [ $? -ne 0 ]; then
+  echo "Error: Failed to install udev rule. Aborting installation."
+  exit 1
+fi
+
+echo "Reloading udev rules..."
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+if [ $? -ne 0 ]; then
+  echo "Error: Failed to reload udev rules. Aborting installation."
+  exit 1
+fi
+
 # --- Service File Creation ---
 echo "Creating systemd service file: $SERVICE_FILE"
 cat <<EOF > "$PWD/$SERVICE_NAME"

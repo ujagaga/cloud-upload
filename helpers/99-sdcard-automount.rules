@@ -1,0 +1,4 @@
+KERNEL=="mmcblk[0-9]p[0-9]", ACTION=="add", RUN+="/usr/local/bin/sd-automount.sh add %k"
+KERNEL=="mmcblk[0-9]p[0-9]", ACTION=="remove", RUN+="/usr/local/bin/sd-automount.sh remove %k"
+KERNEL=="sd[a-z][0-9]", SUBSYSTEMS=="usb", ACTION=="add", RUN+="/usr/local/bin/sd-automount.sh add %k"
+KERNEL=="sd[a-z][0-9]", SUBSYSTEMS=="usb", ACTION=="remove", RUN+="/usr/local/bin/sd-automount.sh remove %k"
