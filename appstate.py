@@ -4,7 +4,6 @@ On idle the SD card is unmounted so an unstable power supply can't corrupt its
 file system while the device can do no useful work.
 """
 import os
-import shutil
 import subprocess
 
 import settings
@@ -121,32 +120,25 @@ def mount_sd(devname):
 
 def persist_file_to_flash(src, dest_relpath, label):
     """Copy src onto the boot flash at dest_relpath so it survives a reboot
-    in RAM-only mode. Remounts the flash read-write, copies, syncs, unmounts
-    again. Returns (ok, msg). Needs root / a sudoers rule for mount+umount
-    of FLASH_DEVICE."""
+    in RAM-only mode, via the sudoers-granted flash-persist.sh helper (the
+    app's own service user isn't root, so mount/umount need it — same
+    pattern as sd-automount.sh / wifi-*.sh). Returns (ok, msg)."""
     if not settings.FLASH_DEVICE:
         return False, "Flash persist not configured (FLASH_DEVICE empty)."
     if not os.path.isfile(src):
         return False, f"No {label} to persist."
 
-    mp = settings.FLASH_MOUNTPOINT
-    dest = os.path.join(mp, dest_relpath)
-
     try:
-        os.makedirs(mp, exist_ok=True)
-        r = subprocess.run(["mount", "-o", "rw", settings.FLASH_DEVICE, mp],
-                           capture_output=True, text=True)
-        if r.returncode != 0:
-            return False, f"Could not mount flash: {r.stderr.strip()}"
-        try:
-            os.makedirs(os.path.dirname(dest), exist_ok=True)
-            shutil.copy2(src, dest)
-            subprocess.run(["sync"], check=False)
-        finally:
-            subprocess.run(["umount", mp], capture_output=True, text=True)
-    except Exception as exc:
-        return False, f"Flash persist failed: {exc}"
+        r = subprocess.run(
+            ["sudo", "-n", "/usr/local/bin/flash-persist.sh",
+             settings.FLASH_DEVICE, settings.FLASH_MOUNTPOINT, src, dest_relpath],
+            capture_output=True, text=True,
+        )
+    except FileNotFoundError:
+        return False, "flash-persist.sh not installed. Run install.sh."
 
+    if r.returncode != 0:
+        return False, f"Flash persist failed: {r.stderr.strip()}"
     return True, f"Saved {label} to flash."
 
 

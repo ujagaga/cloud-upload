@@ -27,8 +27,8 @@ TOKEN_FILE = "token.json"
 # is offered instead).
 FLASH_DEVICE = ""                       # e.g. "/dev/mmcblk0p1" or "/dev/sda1"
 FLASH_MOUNTPOINT = "/mnt/flash"         # temporary mount point (created if needed)
-FLASH_TOKEN_DEST = "server/token.json"  # path of token.json within the flash
-FLASH_KNOWN_NETWORKS_DEST = "server/known_networks.json"  # path of known_networks.json within the flash
+FLASH_TOKEN_DEST = "token.json"  # path of token.json within the flash
+FLASH_KNOWN_NETWORKS_DEST = "known_networks.json"  # path of known_networks.json within the flash
 # Target folder in Drive. Created if it does not exist.
 DRIVE_FOLDER_NAME = "CloudUpload"
 # Persisted app state (password, options) lives here in the Drive folder. The OS

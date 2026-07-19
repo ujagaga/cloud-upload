@@ -139,6 +139,27 @@ sudo rm -f /etc/netplan/90-cloud-upload-wifi.yaml
 sudo systemctl disable --now wpa_supplicant.service 2>/dev/null
 sudo systemctl mask wpa_supplicant.service
 
+# --- Flash persistence (token.json, known_networks.json survive a reboot
+# in RAM-only mode) ---
+echo "Installing flash-persist script..."
+sudo cp helpers/flash-persist.sh /usr/local/bin/flash-persist.sh
+sudo chmod +x /usr/local/bin/flash-persist.sh
+if [ $? -ne 0 ]; then
+  echo "Error: Failed to install flash-persist.sh. Aborting installation."
+  exit 1
+fi
+
+echo "Allowing $USER to run flash-persist.sh as root..."
+echo "$USER ALL=(root) NOPASSWD: /usr/local/bin/flash-persist.sh" | sudo tee "$PWD/flash-persist-sudoers" > /dev/null
+sudo visudo -cf "$PWD/flash-persist-sudoers"
+if [ $? -ne 0 ]; then
+  echo "Error: Generated flash-persist sudoers rule failed validation. Aborting installation."
+  rm -f "$PWD/flash-persist-sudoers"
+  exit 1
+fi
+sudo mv "$PWD/flash-persist-sudoers" /etc/sudoers.d/flash-persist
+sudo chmod 440 /etc/sudoers.d/flash-persist
+
 # --- Service File Creation ---
 echo "Creating systemd service file: $SERVICE_FILE"
 cat <<EOF > "$PWD/$SERVICE_NAME"
