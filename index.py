@@ -180,6 +180,18 @@ def start():
     return redirect(url_for('index'))
 
 
+@application.route('/shutdown', methods=['POST'])
+@login_required
+def shutdown():
+    processor.stop_and_wait()
+    appstate.unmount_sd()
+    ok, message = appstate.power_off()
+    if not ok:
+        flash(message)
+        return redirect(url_for('index'))
+    return "Shutting down…"
+
+
 def _reconnect_and_resume():
     """Retry Drive reachability; on success, remount an unmounted card if
     present and resume any pending upload. Returns (mode, start_result),

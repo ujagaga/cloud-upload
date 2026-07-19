@@ -8,6 +8,7 @@ import appstate
 
 _lock = threading.Lock()
 _thread = None
+_stop_event = threading.Event()
 
 # Files (path, size, mtime) already uploaded or confirmed-on-Drive during this
 # process's lifetime. RAM only, by design: a restart is allowed to forget it
@@ -69,6 +70,7 @@ def _reset(total, folder, message=""):
 
 def _worker(images, folder_name, delete_after):
     aborted = False
+    stopped = False
     try:
         service = gdrive.get_service()
         root_id = gdrive.ensure_folder(service, settings.DRIVE_FOLDER_NAME)
@@ -76,6 +78,10 @@ def _worker(images, folder_name, delete_after):
         existing = gdrive.list_folder_files(service, folder_id)
 
         for src in images:
+            if _stop_event.is_set():
+                stopped = True
+                break
+
             name = os.path.basename(src)
             with _lock:
                 _state["current"] = name
@@ -118,11 +124,14 @@ def _worker(images, folder_name, delete_after):
                         _state["errors"].append(f"{name}: delete failed: {exc}")
 
         with _lock:
-            deleted_note = f", {_state['deleted']} deleted" if delete_after else ""
-            _state["message"] = (
-                f"Done. {_state['uploaded']} uploaded, {_state['skipped']} skipped"
-                f"{deleted_note}, {len(_state['errors'])} failed."
-            )
+            if stopped:
+                _state["message"] = f"Stopped after {_state['done']}/{_state['total']}."
+            else:
+                deleted_note = f", {_state['deleted']} deleted" if delete_after else ""
+                _state["message"] = (
+                    f"Done. {_state['uploaded']} uploaded, {_state['skipped']} skipped"
+                    f"{deleted_note}, {len(_state['errors'])} failed."
+                )
     except Exception as exc:
         print(f"Upload aborted: {exc}")
         aborted = True
@@ -135,7 +144,7 @@ def _worker(images, folder_name, delete_after):
             _state["finished"] = True
 
     with _lock:
-        all_succeeded = not aborted and not _state["errors"]
+        all_succeeded = not aborted and not stopped and not _state["errors"]
 
     if delete_after or all_succeeded:
         # images[0]'s directory, not images[0] itself: delete_after may have
@@ -144,6 +153,16 @@ def _worker(images, folder_name, delete_after):
         hint = os.path.dirname(images[0]) if images else None
         ok, msg = appstate.unmount_sd(hint)
         print(f"Post-upload unmount: {msg}")
+
+
+def stop_and_wait(timeout=15):
+    """Ask an in-progress run to stop after its current file finishes, and
+    wait briefly for it to actually exit. Safe to call even if nothing is
+    running (join/is_alive on a None or already-finished thread is a no-op)."""
+    _stop_event.set()
+    if _thread and _thread.is_alive():
+        _thread.join(timeout=timeout)
+    _stop_event.clear()
 
 
 def start(delete_after=False):

@@ -59,7 +59,10 @@ h1 {
   margin: 5px;
   padding: 8px 12px;
   background: #333;
+  border: none;
   border-radius: 4px;
+  font: inherit;
+  cursor: pointer;
 }
 
 .nav_btn:hover {

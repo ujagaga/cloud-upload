@@ -146,6 +146,19 @@ def persist_token_to_flash():
     return persist_file_to_flash(gdrive.TOKEN_PATH, settings.FLASH_TOKEN_DEST, "token.json")
 
 
+def power_off():
+    """Power off the device. Needs the sudoers rule install.sh sets up for
+    this exact command. Returns (ok, msg) — on success the device is going
+    down, so the caller won't get much chance to act on it."""
+    try:
+        r = subprocess.run(["sudo", "-n", "/usr/sbin/poweroff"], capture_output=True, text=True)
+    except FileNotFoundError:
+        return False, "poweroff not found."
+    if r.returncode == 0:
+        return True, "Shutting down."
+    return False, r.stderr.strip() or "Failed to power off."
+
+
 def _go_idle(reason):
     global _mode, _reason
     _mode = MODE_IDLE

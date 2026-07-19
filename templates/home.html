@@ -5,6 +5,13 @@
 
   <nav class="top_nav">
     <a href="{{ url_for('config') }}" class="nav_btn nav_left" title="Config"><i class="fa-solid fa-gear"></i></a>
+    <form method="POST" action="{{ url_for('shutdown') }}" style="display:inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="nav_btn" title="Shut down"
+              onclick="return confirm('Shut down the device? Any active upload will be stopped and the SD card unmounted first.')">
+        <i class="fa-solid fa-power-off"></i>
+      </button>
+    </form>
     <a href="{{ url_for('logout') }}" class="nav_btn" title="Log out"><i class="fa-solid fa-right-from-bracket"></i></a>
   </nav>
 

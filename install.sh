@@ -164,6 +164,18 @@ fi
 sudo mv "$PWD/flash-persist-sudoers" /etc/sudoers.d/flash-persist
 sudo chmod 440 /etc/sudoers.d/flash-persist
 
+# --- Shutdown button ---
+echo "Allowing $USER to power off the device (for the home page shutdown button)..."
+echo "$USER ALL=(root) NOPASSWD: /usr/sbin/poweroff" | sudo tee "$PWD/shutdown-sudoers" > /dev/null
+sudo visudo -cf "$PWD/shutdown-sudoers"
+if [ $? -ne 0 ]; then
+  echo "Error: Generated shutdown sudoers rule failed validation. Aborting installation."
+  rm -f "$PWD/shutdown-sudoers"
+  exit 1
+fi
+sudo mv "$PWD/shutdown-sudoers" /etc/sudoers.d/shutdown
+sudo chmod 440 /etc/sudoers.d/shutdown
+
 # --- Service File Creation ---
 echo "Creating systemd service file: $SERVICE_FILE"
 cat <<EOF > "$PWD/$SERVICE_NAME"
