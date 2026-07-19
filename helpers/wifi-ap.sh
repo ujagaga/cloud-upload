@@ -17,7 +17,6 @@ HOSTAPD_CONF="/etc/hostapd/hostapd-cloudupload.conf"
 DNSMASQ_CONF="/etc/dnsmasq-cloudupload.conf"
 HOSTAPD_PID="/run/cloudupload-hostapd.pid"
 DNSMASQ_PID="/run/cloudupload-dnsmasq.pid"
-NETPLAN_WIFI_FILE="/etc/netplan/90-cloud-upload-wifi.yaml"
 
 # Kills by matching the actual config file on the command line, not just a
 # PID file — a stale or missing PID file must never leave a previous
@@ -49,9 +48,9 @@ case "$ACTION" in
     # top of a possibly still-running (or half-dead) previous one.
     stop_ap
 
-    # Drop any client-mode config so it doesn't fight hostapd for the radio.
-    rm -f "$NETPLAN_WIFI_FILE"
-    netplan apply || true
+    # Release the radio from station mode first — mutually exclusive on this
+    # hardware. Already root, so a plain call, no sudo.
+    /usr/local/bin/wifi-sta.sh stop
     sleep 2  # let the radio/driver settle before hostapd claims the interface
 
     rfkill unblock wifi || true

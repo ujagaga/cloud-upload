@@ -98,9 +98,9 @@ sudo chmod 440 /etc/sudoers.d/sd-automount
 # --- WiFi Setup (fallback AP when there's no internet) ---
 echo "Installing WiFi setup scripts..."
 sudo cp helpers/wifi-ap.sh /usr/local/bin/wifi-ap.sh
-sudo cp helpers/wifi-connect.sh /usr/local/bin/wifi-connect.sh
+sudo cp helpers/wifi-sta.sh /usr/local/bin/wifi-sta.sh
 sudo cp helpers/wifi-scan.sh /usr/local/bin/wifi-scan.sh
-sudo chmod +x /usr/local/bin/wifi-ap.sh /usr/local/bin/wifi-connect.sh /usr/local/bin/wifi-scan.sh
+sudo chmod +x /usr/local/bin/wifi-ap.sh /usr/local/bin/wifi-sta.sh /usr/local/bin/wifi-scan.sh
 if [ $? -ne 0 ]; then
   echo "Error: Failed to install WiFi setup scripts. Aborting installation."
   exit 1
@@ -109,7 +109,7 @@ fi
 echo "Allowing $USER to run the WiFi setup scripts as root..."
 cat <<EOF | sudo tee "$PWD/wifi-sudoers" > /dev/null
 $USER ALL=(root) NOPASSWD: /usr/local/bin/wifi-ap.sh
-$USER ALL=(root) NOPASSWD: /usr/local/bin/wifi-connect.sh
+$USER ALL=(root) NOPASSWD: /usr/local/bin/wifi-sta.sh
 $USER ALL=(root) NOPASSWD: /usr/local/bin/wifi-scan.sh
 $USER ALL=(root) NOPASSWD: /usr/bin/resolvectl mdns wlan0 yes
 EOF
@@ -128,6 +128,16 @@ if ! grep -q "^MulticastDNS=yes" /etc/systemd/resolved.conf 2>/dev/null; then
   grep -q "^MulticastDNS=yes" /etc/systemd/resolved.conf || echo "MulticastDNS=yes" | sudo tee -a /etc/systemd/resolved.conf > /dev/null
   sudo systemctl restart systemd-resolved
 fi
+
+# wlan0 is now controlled directly (wifi-ap.sh / wifi-sta.sh), not through
+# Netplan — remove any leftover Netplan wifi config from an earlier install
+# and disable the system wpa_supplicant service Netplan used to drive, since
+# this app runs its own dedicated wpa_supplicant instance instead. Ethernet
+# stays fully managed by Netplan; its config never mentions wlan0.
+echo "Removing Netplan-based WiFi config (now handled directly)..."
+sudo rm -f /etc/netplan/90-cloud-upload-wifi.yaml
+sudo systemctl disable --now wpa_supplicant.service 2>/dev/null
+sudo systemctl mask wpa_supplicant.service
 
 # --- Service File Creation ---
 echo "Creating systemd service file: $SERVICE_FILE"

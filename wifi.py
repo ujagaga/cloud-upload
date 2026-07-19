@@ -2,6 +2,14 @@
 internet, let the user pick a network from their phone, then switch wlan0 to
 station mode and join it.
 
+wlan0 is controlled directly here — a dedicated wpa_supplicant instance plus
+dhcpcd for addressing, no Netplan/systemd-networkd involved. This device
+only ever runs this one app, so bypassing Netplan's whole-system
+reconciliation (each `netplan apply` reconfigures every managed interface,
+not just the one that changed) in favor of narrow, direct control of just
+this one radio is both simpler and safer here — Netplan-driven wlan0 changes
+caused several full-device lockups during testing.
+
 AP and station mode are mutually exclusive on this hardware (single radio,
 `iw list`'s interface combinations cap {managed, AP} at 1 total — no
 concurrent AP+STA), so this is always a sequential hand-off: connecting to a
@@ -50,16 +58,6 @@ def _remember_network(ssid, password):
         json.dump(networks, f, indent=2)
 
 
-def _first_known_in_range(scanned_ssids):
-    """Highest-priority known network that's also in the given scan results,
-    as (ssid, password), or None."""
-    scanned = set(scanned_ssids)
-    for n in load_known_networks():
-        if n.get("ssid") in scanned:
-            return n["ssid"], n.get("password", "")
-    return None
-
-
 def get_status():
     with _lock:
         return dict(_state)
@@ -90,6 +88,17 @@ def is_ap_active() -> bool:
     try:
         r = subprocess.run(
             ["sudo", "-n", "/usr/local/bin/wifi-ap.sh", "status"],
+            capture_output=True, text=True,
+        )
+        return r.stdout.strip() == "active"
+    except FileNotFoundError:
+        return False
+
+
+def is_sta_active() -> bool:
+    try:
+        r = subprocess.run(
+            ["sudo", "-n", "/usr/local/bin/wifi-sta.sh", "status"],
             capture_output=True, text=True,
         )
         return r.stdout.strip() == "active"
@@ -173,49 +182,57 @@ def stop_ap():
     return r.returncode == 0, (r.stdout.strip() or r.stderr.strip() or "Stopped setup AP.")
 
 
-def _write_netplan_wifi(ssid, password):
-    # Valid JSON is valid YAML flow syntax, so json.dumps() gives safe
-    # escaping (quotes, unicode, special characters) with no YAML library.
-    access_point = {ssid: ({"password": password} if password else {})}
-    content = (
-        "network:\n"
-        "  version: 2\n"
-        "  wifis:\n"
-        "    wlan0:\n"
-        "      dhcp4: true\n"
-        f"      access-points: {json.dumps(access_point)}\n"
+def stop_sta():
+    r = subprocess.run(
+        ["sudo", "-n", "/usr/local/bin/wifi-sta.sh", "stop"],
+        capture_output=True, text=True,
     )
-    fd, path = tempfile.mkstemp(prefix="cloudupload-wifi-", suffix=".yaml")
+    return r.returncode == 0, (r.stdout.strip() or r.stderr.strip() or "Stopped WiFi client.")
+
+
+def _wpa_escape(s):
+    return s.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _write_wpa_conf(networks):
+    """wpa_supplicant conf with one network={} block per entry, highest
+    priority first in the list. Letting wpa_supplicant hold every known
+    network at once (rather than us picking one and retrying) means it does
+    its own scanning/roaming natively — more robust than reimplementing that
+    ourselves, and it's exactly what's needed for auto-reconnect."""
+    lines = ["ctrl_interface=/run/wpa_supplicant-cloudupload", "update_config=0", ""]
+    total = len(networks)
+    for i, net in enumerate(networks):
+        ssid = _wpa_escape(net["ssid"])
+        password = net.get("password", "")
+        lines.append("network={")
+        lines.append(f'    ssid="{ssid}"')
+        if password:
+            lines.append(f'    psk="{_wpa_escape(password)}"')
+        else:
+            lines.append("    key_mgmt=NONE")
+        lines.append(f"    priority={total - i}")
+        lines.append("}")
+
+    fd, path = tempfile.mkstemp(prefix="cloudupload-wpa-", suffix=".conf")
     with os.fdopen(fd, "w") as f:
-        f.write(content)
+        f.write("\n".join(lines) + "\n")
     return path
 
 
-def _connect_worker(ssid, password, timeout):
-    # hostapd may still be holding wlan0 in AP mode (the normal case: the
-    # caller is on the setup AP right now). This hardware can't run AP and
-    # station mode at once, so the AP must be fully torn down before asking
-    # netplan/wpa_supplicant to claim the interface for a station connection
-    # — applying the new config while hostapd still owns wlan0 is exactly
-    # the conflict that caused real lockups during testing.
-    stop_ap()
-    time.sleep(2)  # let the radio/driver settle before handing wlan0 to wpa_supplicant
-
-    tmp_path = _write_netplan_wifi(ssid, password)
+def _start_sta(networks):
+    tmp_path = _write_wpa_conf(networks)
     try:
         r = subprocess.run(
-            ["sudo", "-n", "/usr/local/bin/wifi-connect.sh", "apply", tmp_path],
+            ["sudo", "-n", "/usr/local/bin/wifi-sta.sh", "start", tmp_path],
             capture_output=True, text=True,
         )
     finally:
         os.remove(tmp_path)
+    return r.returncode == 0, (r.stderr.strip() or "Failed to start WiFi client mode.")
 
-    if r.returncode != 0:
-        start_ap()
-        with _lock:
-            _state.update(phase="failed", message=r.stderr.strip() or "Failed to apply WiFi configuration.")
-        return
 
+def _wait_for_connection(timeout):
     deadline = time.time() + timeout
     while time.time() < deadline:
         if _wlan0_connected():
@@ -223,15 +240,27 @@ def _connect_worker(ssid, password, timeout):
             # instead of hunting for whatever IP this network handed out.
             subprocess.run(["sudo", "-n", "resolvectl", "mdns", "wlan0", "yes"],
                             capture_output=True, text=True)
-            _remember_network(ssid, password)
-            with _lock:
-                _state.update(phase="connected", message=f"Connected to {ssid}.")
-            return
+            return True
         time.sleep(2)
+    return False
+
+
+def _connect_worker(ssid, password, timeout):
+    ok, message = _start_sta([{"ssid": ssid, "password": password}])
+    if not ok:
+        start_ap()
+        with _lock:
+            _state.update(phase="failed", message=message)
+        return
+
+    if _wait_for_connection(timeout):
+        _remember_network(ssid, password)
+        with _lock:
+            _state.update(phase="connected", message=f"Connected to {ssid}.")
+        return
 
     # Didn't come online in time — revert so the user isn't locked out.
-    subprocess.run(["sudo", "-n", "/usr/local/bin/wifi-connect.sh", "revert"],
-                    capture_output=True, text=True)
+    stop_sta()
     start_ap()
     with _lock:
         _state.update(phase="failed",
@@ -252,21 +281,42 @@ def start_connect(ssid, password, timeout=None):
     return True, "Started."
 
 
+def _auto_connect_worker(networks, timeout):
+    ok, message = _start_sta(networks)
+    if not ok:
+        start_ap()
+        with _lock:
+            _state.update(phase="failed", message=message)
+        return
+
+    if _wait_for_connection(timeout):
+        with _lock:
+            _state.update(phase="connected", message="Connected to a known network.")
+        return
+
+    stop_sta()
+    start_ap()
+    with _lock:
+        _state.update(phase="failed", message="No known network found in range.")
+
+
 def auto_connect_known():
-    """If a known network is currently in range, kick off connecting to the
-    highest-priority match (non-blocking, same as start_connect). Returns
-    True if an attempt was started, False if no known network is in range
-    (or one is already in progress)."""
-    if get_status()["phase"] == "connecting":
-        return False
-    match = _first_known_in_range(n["ssid"] for n in scan_networks())
-    if not match:
-        return False
-    ssid, password = match
-    start_connect(ssid, password)
+    """If any known networks are saved, let wpa_supplicant try all of them
+    at once (non-blocking, same as start_connect) — it scans and picks the
+    best match on its own. Returns True if an attempt was started, False if
+    there are no known networks (or one is already in progress)."""
+    with _lock:
+        if _state["phase"] == "connecting":
+            return False
+        networks = load_known_networks()
+        if not networks:
+            return False
+        _state.update(phase="connecting", message="Trying known networks…", ssid="")
+
+    timeout = settings.WIFI_CONNECT_TIMEOUT
+    threading.Thread(target=_auto_connect_worker, args=(networks, timeout), daemon=True).start()
     return True
 
 
 def disconnect():
-    subprocess.run(["sudo", "-n", "/usr/local/bin/wifi-connect.sh", "revert"],
-                    capture_output=True, text=True)
+    stop_sta()
