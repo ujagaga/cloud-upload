@@ -8,9 +8,9 @@ so every call here fails silently rather than raising.
 try:
     from luma.core.interface.serial import i2c
     from luma.core.render import canvas
-    from luma.oled.device import ssd1306
+    from luma.oled.device import sh1106
 except ImportError:
-    i2c = canvas = ssd1306 = None
+    i2c = canvas = sh1106 = None
 
 I2C_PORT = 2
 I2C_ADDRESS = 0x3C
@@ -23,7 +23,7 @@ def _get_device():
     global _device
     if _device is None:
         serial = i2c(port=I2C_PORT, address=I2C_ADDRESS)
-        _device = ssd1306(serial)
+        _device = sh1106(serial)
     return _device
 
 
@@ -31,7 +31,7 @@ def show_lines(*lines):
     """Render up to a handful of short text lines, one per row. A no-op if
     luma.oled isn't installed or the display isn't actually wired up —
     this is a convenience readout, never a hard dependency."""
-    if ssd1306 is None:
+    if sh1106 is None:
         return
     try:
         device = _get_device()

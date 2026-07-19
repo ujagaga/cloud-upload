@@ -139,6 +139,10 @@ sudo rm -f /etc/netplan/90-cloud-upload-wifi.yaml
 sudo systemctl disable --now wpa_supplicant.service 2>/dev/null
 sudo systemctl mask wpa_supplicant.service
 
+# --- I2C OLED status display (optional hardware; harmless if not wired) ---
+echo "Adding $USER to the i2c group (for /dev/i2c-* access, e.g. the status display)..."
+sudo usermod -aG i2c "$USER"
+
 # --- Flash persistence (token.json, known_networks.json survive a reboot
 # in RAM-only mode) ---
 echo "Installing flash-persist script..."
