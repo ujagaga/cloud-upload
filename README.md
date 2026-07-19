@@ -65,8 +65,51 @@ Reached via the gear icon on the home page:
 - **Google Drive account** — shows the linked account's email, with a button
   to disconnect it (deletes `token.json` and sends you to the authorize page
   to link a different account).
+- **WiFi** — link to the WiFi setup page below.
 - **Upload options** — the auto-upload and delete-after-upload toggles above.
 - **Change password** — with a show/hide button on each field.
+
+### WiFi setup
+
+The device needs *some* network to be reachable at all, but on-site it may
+have no known WiFi and no Ethernet. `/wifi` (linked from Config, and reachable
+directly if the device is offline — see below) handles getting it online:
+
+1. **No internet at all** (checked separately from Drive reachability, every
+   30 seconds): the device starts its own access point (`WIFI_AP_SSID`/
+   `WIFI_AP_PASSWORD` in `settings.py`) so you can connect a phone to it
+   directly and reach `/wifi` at `192.168.4.1`.
+2. The page shows nearby networks (captured in one scan right before the AP
+   started — see the note on scanning below) and a form to enter a network's
+   name/password manually if it's not listed or the list is stale.
+3. Submitting a network switches `wlan0` to station mode and tries it for up
+   to `WIFI_CONNECT_TIMEOUT` seconds (default 30). On success it's saved to
+   `known_networks.json` for next time. On failure/timeout, the device
+   **reverts to its own access point automatically** — a wrong password or a
+   network that goes out of range can't strand you without another way in.
+4. Once connected, previously-seen networks are tried again automatically
+   the next time the device has no internet (`known_networks.json`, ordered
+   by most-recently-used first) — no need to redo setup every time it moves
+   between the same locations.
+
+**Hardware note:** this radio can only run in *one* mode at a time — either
+the setup access point or a station (client) connection, never both
+(`iw list`'s interface combinations cap `{managed, AP}` at 1 total). So
+connecting to a chosen network always drops the setup AP, and scanning while
+a phone is connected to that AP isn't possible without disconnecting it —
+which is why the network list is captured once, just before the AP comes up,
+rather than refreshed live while you're connected to it.
+
+`wlan0` is controlled directly (a dedicated `wpa_supplicant` instance +
+`dhcpcd`), not through Netplan — deliberately, since Netplan's `apply`
+reconfigures every managed interface it knows about, not just the one that
+changed, and repeatedly caused full-device lockups when used to toggle this
+radio. Ethernet is unaffected either way; its Netplan config only ever
+matches `"e*"` interfaces and none of the WiFi tooling touches it.
+
+Once connected, the device also enables mDNS on `wlan0`, so you can reach it
+at `<hostname>.local` instead of hunting for whatever IP the network handed
+out (`hostnamectl hostname` shows the device's hostname).
 
 ## Setup
 
@@ -116,10 +159,16 @@ Edit `settings.py` and set at least:
 - `INITIAL_PASSWORD`, `MASTER_PASSWORD`
 - `APP_SECRET_KEY` (a long random string)
 - `DRIVE_FOLDER_NAME` (the root Drive folder for uploads)
-- `FLASH_DEVICE` / `FLASH_MOUNTPOINT` / `FLASH_TOKEN_DEST` — only needed if you
-  authorize on-device (method A) and want the token saved to the boot flash
-  automatically. Leave `FLASH_DEVICE` empty to instead download the token and
-  copy it manually.
+- `FLASH_DEVICE` / `FLASH_MOUNTPOINT` / `FLASH_TOKEN_DEST` / `FLASH_KNOWN_NETWORKS_DEST`
+  — only needed if you authorize on-device (method A) and want `token.json`/
+  `known_networks.json` saved to the boot flash automatically, so they survive
+  a reboot once the OS runs from RAM. Leave `FLASH_DEVICE` empty to instead
+  download `token.json` manually (WiFi credentials just won't survive a
+  reboot in that case).
+- `WIFI_AP_SSID` / `WIFI_AP_PASSWORD` — the setup access point's own name/
+  password (see WiFi setup above). Defaults work fine; change the password
+  from the default if the device will be used somewhere with strangers in
+  range.
 
 ### 3. Install and run
 
@@ -150,14 +199,20 @@ sdcard.py           detect the SD card (mounted and unmounted), list images, der
 processor.py        background worker: scan → upload → (optional) delete → (optional) unmount
 helper.py           password verify/set
 authorize_drive.py  alternative one-time OAuth helper (run on a laptop)
+wifi.py             WiFi setup AP, scan, connect/disconnect, known-network auto-reconnect
 settings.py         configuration (not committed)
-templates/ static/  web UI (home, config, authorize, sign-in pages)
-install.sh          dependency install + systemd service + SD automount + sudoers rule
+templates/ static/  web UI (home, config, authorize, sign-in, WiFi setup pages)
+install.sh          dependency install + systemd service + SD automount + WiFi + sudoers rules
 run_server.sh       start gunicorn
+known_networks.json known WiFi networks (priority-ordered, most recent first) — runtime, not committed
 helpers/
-  sd-automount.sh          mount an SD card partition under /media on insert or on
-                           demand (uses systemd-mount, not raw mount — see below)
+  sd-automount.sh            mount an SD card partition under /media on insert or on
+                             demand (uses systemd-mount, not raw mount — see below)
   99-sdcard-automount.rules  udev rule invoking sd-automount.sh on add/remove
+  wifi-ap.sh                 start/stop the WiFi setup access point (hostapd + dnsmasq)
+  wifi-sta.sh                start/stop wlan0 station mode (dedicated wpa_supplicant + dhcpcd)
+  wifi-scan.sh               scan for nearby WiFi networks
+  flash-persist.sh           copy a file onto the boot flash (token.json, known_networks.json)
 ```
 
 ## Notes and limitations
@@ -188,3 +243,19 @@ helpers/
   dead link it waits for the HTTP timeout before falling back to idle.
 - The refresh token in `token.json` is read fresh at each boot. If Google ever
   rotates it, update `token.json` on the flash image.
+- **WiFi is checked separately from Drive.** A background loop checks general
+  internet reachability (any interface) every 30 seconds and only steps in —
+  trying known networks, then falling back to the setup AP — when there's
+  none at all. So on a device that also has working Ethernet, the WiFi
+  fallback/auto-reconnect logic never triggers, by design; it only matters
+  when WiFi is the sole way online.
+- All of the WiFi scripts (`wifi-ap.sh`, `wifi-sta.sh`, `wifi-scan.sh`) and
+  `flash-persist.sh` need `install.sh`'s narrowly-scoped `NOPASSWD` sudoers
+  rules (`/etc/sudoers.d/cloud-upload-wifi`, `/etc/sudoers.d/flash-persist`)
+  to run as root from the app's unprivileged service user — same pattern as
+  the SD automount button. Re-run `install.sh` after upgrading if WiFi setup
+  or flash persistence stop working.
+- `install.sh` masks the system `wpa_supplicant.service` (previously driven by
+  Netplan) and removes any leftover `/etc/netplan/90-cloud-upload-wifi.yaml`
+  from an older install, since the app now runs its own dedicated
+  `wpa_supplicant` instance for `wlan0` instead.
