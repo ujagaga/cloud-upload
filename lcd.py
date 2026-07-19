@@ -45,7 +45,7 @@ def show_lines(*lines):
 
 
 def _drive_line(drive_ok, drive_reason):
-    return "Drive: connected" if drive_ok else f"Drive: {drive_reason or 'idle'}"
+    return "GDrive: connected" if drive_ok else f"GDrive: {drive_reason or 'idle'}"
 
 
 def show_ap_screen(ssid, password, ip):
