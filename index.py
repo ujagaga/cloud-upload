@@ -227,9 +227,12 @@ def _wifi_watchdog_loop():
             if wifi.get_status()['phase'] != 'connecting':
                 online = wifi.has_internet()
                 if not online and not wifi.is_ap_active():
-                    ok, msg = wifi.start_ap()
-                    _wifi_ap_started_by_watchdog = ok
-                    print(f"WiFi watchdog: no internet, started setup AP: {msg}")
+                    if wifi.auto_connect_known():
+                        print("WiFi watchdog: known network in range, attempting to reconnect.")
+                    else:
+                        ok, msg = wifi.start_ap()
+                        _wifi_ap_started_by_watchdog = ok
+                        print(f"WiFi watchdog: no internet, started setup AP: {msg}")
                 elif online and wifi.is_ap_active() and _wifi_ap_started_by_watchdog:
                     # Came online on its own (e.g. Ethernet plugged back in)
                     # while the watchdog's own AP was up for no reason now.

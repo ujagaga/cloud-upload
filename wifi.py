@@ -30,6 +30,35 @@ _lock = threading.Lock()
 _state = {"phase": "idle", "message": "", "ssid": ""}
 _last_scan = []
 
+KNOWN_NETWORKS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "known_networks.json")
+
+
+def load_known_networks():
+    """Saved networks as a priority-ordered list of {ssid, password} — most
+    recently connected first."""
+    try:
+        with open(KNOWN_NETWORKS_FILE) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+
+def _remember_network(ssid, password):
+    networks = [n for n in load_known_networks() if n.get("ssid") != ssid]
+    networks.insert(0, {"ssid": ssid, "password": password})
+    with open(KNOWN_NETWORKS_FILE, "w") as f:
+        json.dump(networks, f, indent=2)
+
+
+def _first_known_in_range(scanned_ssids):
+    """Highest-priority known network that's also in the given scan results,
+    as (ssid, password), or None."""
+    scanned = set(scanned_ssids)
+    for n in load_known_networks():
+        if n.get("ssid") in scanned:
+            return n["ssid"], n.get("password", "")
+    return None
+
 
 def get_status():
     with _lock:
@@ -194,6 +223,7 @@ def _connect_worker(ssid, password, timeout):
             # instead of hunting for whatever IP this network handed out.
             subprocess.run(["sudo", "-n", "resolvectl", "mdns", "wlan0", "yes"],
                             capture_output=True, text=True)
+            _remember_network(ssid, password)
             with _lock:
                 _state.update(phase="connected", message=f"Connected to {ssid}.")
             return
@@ -220,6 +250,21 @@ def start_connect(ssid, password, timeout=None):
     timeout = timeout or settings.WIFI_CONNECT_TIMEOUT
     threading.Thread(target=_connect_worker, args=(ssid, password, timeout), daemon=True).start()
     return True, "Started."
+
+
+def auto_connect_known():
+    """If a known network is currently in range, kick off connecting to the
+    highest-priority match (non-blocking, same as start_connect). Returns
+    True if an attempt was started, False if no known network is in range
+    (or one is already in progress)."""
+    if get_status()["phase"] == "connecting":
+        return False
+    match = _first_known_in_range(n["ssid"] for n in scan_networks())
+    if not match:
+        return False
+    ssid, password = match
+    start_connect(ssid, password)
+    return True
 
 
 def disconnect():
