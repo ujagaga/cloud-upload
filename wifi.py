@@ -33,6 +33,7 @@ import time
 
 import requests
 import appstate
+import lcd
 import settings
 
 _lock = threading.Lock()
@@ -89,6 +90,32 @@ def _wlan0_connected() -> bool:
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False
     return " inet " in r.stdout and "169.254." not in r.stdout
+
+
+def _wlan0_ip():
+    """wlan0's current IPv4 address, or None."""
+    try:
+        r = subprocess.run(["ip", "-4", "-o", "addr", "show", "wlan0"],
+                            capture_output=True, text=True, timeout=5)
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+    tokens = r.stdout.split()
+    if "inet" in tokens:
+        return tokens[tokens.index("inet") + 1].split("/")[0]
+    return None
+
+
+def show_starting():
+    lcd.show_lines("Cloud Upload", "Starting up…")
+
+
+def refresh_lcd():
+    """Update the LCD to reflect current reality — called on every watchdog
+    tick (in addition to the event-triggered updates elsewhere) so Drive
+    status stays current even without a new WiFi event."""
+    if is_sta_active():
+        ip = _wlan0_ip() or "?"
+        lcd.show_station_screen(ip, appstate.is_active(), appstate.get_reason())
 
 
 def is_ap_active() -> bool:
@@ -178,7 +205,10 @@ def start_ap():
         ["sudo", "-n", "/usr/local/bin/wifi-ap.sh", "start", ssid, password],
         capture_output=True, text=True,
     )
-    return r.returncode == 0, (r.stdout.strip() or r.stderr.strip() or "Started setup AP.")
+    ok = r.returncode == 0
+    if ok:
+        lcd.show_ap_screen(ssid, password, "192.168.4.1")
+    return ok, (r.stdout.strip() or r.stderr.strip() or "Started setup AP.")
 
 
 def stop_ap():
@@ -247,6 +277,8 @@ def _wait_for_connection(timeout):
             # instead of hunting for whatever IP this network handed out.
             subprocess.run(["sudo", "-n", "resolvectl", "mdns", "wlan0", "yes"],
                             capture_output=True, text=True)
+            ip = _wlan0_ip() or "?"
+            lcd.show_station_screen(ip, appstate.is_active(), appstate.get_reason())
             return True
         time.sleep(2)
     return False

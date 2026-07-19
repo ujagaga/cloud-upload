@@ -37,7 +37,7 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "Installing Python packages..."
-pip3 install flask flask-wtf google-api-python-client google-auth google-auth-oauthlib gunicorn requests
+pip3 install flask flask-wtf google-api-python-client google-auth google-auth-oauthlib gunicorn requests luma.oled
 if [ $? -ne 0 ]; then
   echo "Error: Failed to install python libraries. Aborting installation."
   exit 1

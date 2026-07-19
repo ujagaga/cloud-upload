@@ -238,6 +238,7 @@ def _wifi_watchdog_loop():
                     # while the watchdog's own AP was up for no reason now.
                     ok, msg = wifi.stop_ap()
                     _wifi_ap_started_by_watchdog = not ok
+                wifi.refresh_lcd()
         except Exception as exc:
             print(f"WiFi watchdog error: {exc}")
         time.sleep(WIFI_CHECK_INTERVAL_SECONDS)
@@ -337,6 +338,8 @@ def status():
 def drive_status():
     return jsonify({"authorized": gdrive.is_authorized()})
 
+
+wifi.show_starting()
 
 # Decide active/idle at worker startup (single gunicorn worker holds this state).
 appstate.startup()
