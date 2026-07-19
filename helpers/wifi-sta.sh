@@ -47,7 +47,9 @@ case "$1" in
     ip link set "$IFACE" up
 
     wpa_supplicant -B -i "$IFACE" -c "$WPA_CONF" -D nl80211 -P "$WPA_PID"
-    dhcpcd "$IFACE"
+    # -b: background immediately rather than blocking on its own carrier/
+    # lease timeout — the caller polls for the resulting IP independently.
+    dhcpcd -b "$IFACE"
     ;;
   stop)
     stop_sta
