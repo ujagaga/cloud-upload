@@ -119,19 +119,18 @@ def mount_sd(devname):
     return False, r.stderr.strip() or f"Failed to mount {devname}."
 
 
-def persist_token_to_flash():
-    """Copy the runtime token.json onto the boot flash so it survives a reboot.
-    Remounts the flash read-write, copies, syncs, unmounts. Returns (ok, msg).
-    Needs root / a sudoers rule for mount+umount of FLASH_DEVICE."""
+def persist_file_to_flash(src, dest_relpath, label):
+    """Copy src onto the boot flash at dest_relpath so it survives a reboot
+    in RAM-only mode. Remounts the flash read-write, copies, syncs, unmounts
+    again. Returns (ok, msg). Needs root / a sudoers rule for mount+umount
+    of FLASH_DEVICE."""
     if not settings.FLASH_DEVICE:
         return False, "Flash persist not configured (FLASH_DEVICE empty)."
-
-    src = gdrive.TOKEN_PATH
     if not os.path.isfile(src):
-        return False, "No token.json to persist."
+        return False, f"No {label} to persist."
 
     mp = settings.FLASH_MOUNTPOINT
-    dest = os.path.join(mp, settings.FLASH_TOKEN_DEST)
+    dest = os.path.join(mp, dest_relpath)
 
     try:
         os.makedirs(mp, exist_ok=True)
@@ -148,7 +147,11 @@ def persist_token_to_flash():
     except Exception as exc:
         return False, f"Flash persist failed: {exc}"
 
-    return True, "Saved token.json to flash."
+    return True, f"Saved {label} to flash."
+
+
+def persist_token_to_flash():
+    return persist_file_to_flash(gdrive.TOKEN_PATH, settings.FLASH_TOKEN_DEST, "token.json")
 
 
 def _go_idle(reason):

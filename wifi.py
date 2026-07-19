@@ -32,6 +32,7 @@ import threading
 import time
 
 import requests
+import appstate
 import settings
 
 _lock = threading.Lock()
@@ -56,6 +57,12 @@ def _remember_network(ssid, password):
     networks.insert(0, {"ssid": ssid, "password": password})
     with open(KNOWN_NETWORKS_FILE, "w") as f:
         json.dump(networks, f, indent=2)
+
+    # Same reason token.json needs this: the OS runs from RAM, so anything
+    # written at runtime needs a copy on the boot flash to survive a reboot.
+    ok, msg = appstate.persist_file_to_flash(
+        KNOWN_NETWORKS_FILE, settings.FLASH_KNOWN_NETWORKS_DEST, "known_networks.json")
+    print(f"Flash persist: {msg}")
 
 
 def get_status():
