@@ -44,10 +44,17 @@ def show_lines(*lines):
         print(f"LCD update failed: {exc}")
 
 
+def _drive_line(drive_ok, drive_reason):
+    return "Drive: connected" if drive_ok else f"Drive: {drive_reason or 'idle'}"
+
+
 def show_ap_screen(ssid, password, ip):
     show_lines("Setup WiFi:", f"SSID: {ssid}", f"Pass: {password}", f"IP: {ip}")
 
 
 def show_station_screen(ip, drive_ok, drive_reason=""):
-    drive_line = "Drive: connected" if drive_ok else f"Drive: {drive_reason or 'idle'}"
-    show_lines("WiFi connected", f"IP: {ip}", drive_line)
+    show_lines("WiFi connected", f"IP: {ip}", _drive_line(drive_ok, drive_reason))
+
+
+def show_ethernet_screen(ip, drive_ok, drive_reason=""):
+    show_lines("Ethernet connected", f"IP: {ip}", _drive_line(drive_ok, drive_reason))

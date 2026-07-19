@@ -92,10 +92,9 @@ def _wlan0_connected() -> bool:
     return " inet " in r.stdout and "169.254." not in r.stdout
 
 
-def _wlan0_ip():
-    """wlan0's current IPv4 address, or None."""
+def _iface_ip(iface):
     try:
-        r = subprocess.run(["ip", "-4", "-o", "addr", "show", "wlan0"],
+        r = subprocess.run(["ip", "-4", "-o", "addr", "show", iface],
                             capture_output=True, text=True, timeout=5)
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return None
@@ -105,17 +104,28 @@ def _wlan0_ip():
     return None
 
 
+def _wlan0_ip():
+    """wlan0's current IPv4 address, or None."""
+    return _iface_ip("wlan0")
+
+
 def show_starting():
     lcd.show_lines("Cloud Upload", "Starting up…")
 
 
 def refresh_lcd():
     """Update the LCD to reflect current reality — called on every watchdog
-    tick (in addition to the event-triggered updates elsewhere) so Drive
-    status stays current even without a new WiFi event."""
+    tick (in addition to the event-triggered updates elsewhere) so status
+    stays current even without a new WiFi event. Covers Ethernet too: on a
+    device that also has Ethernet, the watchdog never touches WiFi at all
+    while it's providing internet, so without this the screen would just
+    sit frozen at "Starting up" forever."""
     if is_sta_active():
         ip = _wlan0_ip() or "?"
         lcd.show_station_screen(ip, appstate.is_active(), appstate.get_reason())
+    elif not is_ap_active() and has_internet():
+        ip = _iface_ip("end0") or "?"
+        lcd.show_ethernet_screen(ip, appstate.is_active(), appstate.get_reason())
 
 
 def is_ap_active() -> bool:
