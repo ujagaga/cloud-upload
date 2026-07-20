@@ -181,8 +181,7 @@ echo "Creating systemd service file: $SERVICE_FILE"
 cat <<EOF > "$PWD/$SERVICE_NAME"
 [Unit]
 Description=Image Uploader
-After=network-online.target
-Wants=network-online.target
+After=network.target
 StartLimitIntervalSec=0
 
 [Service]
