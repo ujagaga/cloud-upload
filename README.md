@@ -9,15 +9,17 @@ It is built for unstable travel conditions — flaky internet and unreliable pow
 
 - The OS boots from a flash drive, which is then unmounted so the system runs
   **entirely in RAM**. Nothing is written to local storage.
-- All durable state (your password, options) lives in Google Drive, not on the
-  device. It is downloaded at startup and written back on every change.
+- All durable state (your password, options, `token.json`, known WiFi
+  networks) is saved locally and copied back onto the boot flash on every
+  change, so it survives a reboot even though the OS runs from RAM.
 - If Google Drive is not reachable, the app goes **idle** and unmounts the SD
   card so a power cut cannot corrupt its file system.
 
 ## How it works
 
-1. On startup the app checks whether Google Drive is reachable.
-   - **Reachable** → *active* mode; settings are loaded from Drive.
+1. On startup the app loads its local settings, then checks whether Google
+   Drive is reachable.
+   - **Reachable** → *active* mode.
    - **Not reachable** → *idle* mode; the SD card is unmounted and the UI shows
      the reason plus a **Retry** button.
 2. In active mode, insert an SD card and press **Upload all** — or turn on
@@ -48,13 +50,19 @@ It is built for unstable travel conditions — flaky internet and unreliable pow
   fail to upload are never deleted. Once a run finishes with this on, the app
   also unmounts the card, same as it does in idle mode, so an unexpected power
   cut afterward can't corrupt its file system.
+- **Email notifications** (Config page, off by default): when
+  **Automatically send email when upload is finished** is on, a summary
+  email (files uploaded/skipped/deleted/failed) is sent once a run finishes,
+  to the email address the linked Google Drive account is bound to. Uses the
+  `SMTP_SERVER` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` settings in
+  `settings.py`; a failed send is logged but never interrupts the upload.
 
 ### Access control
 
 Single user, protected by a password.
 
 - `INITIAL_PASSWORD` in `settings.py` is used until you set a password in the UI.
-- The password you set is stored (hashed) in Drive, so it survives reboots.
+- The password you set is stored (hashed) locally, so it survives reboots.
 - `MASTER_PASSWORD` in `settings.py` is a recovery override that always works,
   including in idle mode. It is never stored and never changes through the UI.
 
@@ -66,7 +74,9 @@ Reached via the gear icon on the home page:
   to disconnect it (deletes `token.json` and sends you to the authorize page
   to link a different account).
 - **WiFi** — link to the WiFi setup page below.
-- **Upload options** — the auto-upload and delete-after-upload toggles above.
+- **Upload options** — the auto-upload and delete-after-upload toggles above,
+  plus **Automatically send email when upload is finished** (see Email
+  notifications below).
 - **Change password** — with a show/hide button on each field.
 
 ### WiFi setup
@@ -110,6 +120,32 @@ matches `"e*"` interfaces and none of the WiFi tooling touches it.
 Once connected, the device also enables mDNS on `wlan0`, so you can reach it
 at `<hostname>.local` instead of hunting for whatever IP the network handed
 out (`hostnamectl hostname` shows the device's hostname).
+
+### LCD status display
+
+Optional: a small I2C OLED (128x64, SH1106 controller) wired to the 26-pin
+header's I2C3 label (PH4/PH5), enabled via the `i2c3-ph` device tree overlay.
+Purely a convenience readout — the app works fine with no display attached.
+
+- **Setup AP active:** the AP's SSID, password, and IP.
+- **WiFi/Ethernet connected:** the device's IP (in a larger font — the
+  default is hard to read at this size) and Google Drive's connection status.
+- **Upload in progress:** `<done>/<total> in <N>min`, updated after every
+  file, plus a bytes-uploaded percentage as the bottom row. That percentage
+  stays on screen — as the bottom row — even after the display moves on to
+  the next WiFi/Ethernet/AP screen, until the next upload updates it.
+
+`install.sh` installs `i2c-tools` (for the `i2c` group new devices are
+granted) and `fonts-dejavu-core` (for a crisper IP-address font), and adds
+`overlays=i2c3-ph` to `/boot/armbianEnv.txt` if it isn't there yet — **a
+reboot is required** the first time before `/dev/i2c-2` exists.
+
+### Shutdown button
+
+The home page's power icon (confirmation required) stops any in-progress
+upload, unmounts the SD card, and powers the device off — the safe way to
+pull power on a device that otherwise runs from RAM with no shutdown
+sequence of its own.
 
 ## Setup
 
@@ -159,16 +195,18 @@ Edit `settings.py` and set at least:
 - `INITIAL_PASSWORD`, `MASTER_PASSWORD`
 - `APP_SECRET_KEY` (a long random string)
 - `DRIVE_FOLDER_NAME` (the root Drive folder for uploads)
-- `FLASH_DEVICE` / `FLASH_MOUNTPOINT` / `FLASH_TOKEN_DEST` / `FLASH_KNOWN_NETWORKS_DEST`
-  — only needed if you authorize on-device (method A) and want `token.json`/
-  `known_networks.json` saved to the boot flash automatically, so they survive
-  a reboot once the OS runs from RAM. Leave `FLASH_DEVICE` empty to instead
-  download `token.json` manually (WiFi credentials just won't survive a
-  reboot in that case).
+- `FLASH_DEVICE` / `FLASH_MOUNTPOINT` / `FLASH_TOKEN_DEST` /
+  `FLASH_KNOWN_NETWORKS_DEST` / `FLASH_SETTINGS_DEST` — needed so `token.json`,
+  `known_networks.json`, and the local settings file survive a reboot once the
+  OS runs from RAM; each is copied back to the boot flash on every change.
+  Leave `FLASH_DEVICE` empty to instead download `token.json` manually (none
+  of these will survive a reboot in that case).
 - `WIFI_AP_SSID` / `WIFI_AP_PASSWORD` — the setup access point's own name/
   password (see WiFi setup above). Defaults work fine; change the password
   from the default if the device will be used somewhere with strangers in
   range.
+- `SMTP_SERVER` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` — only needed if you
+  turn on the "Automatically send email when upload is finished" option.
 
 ### 3. Install and run
 
@@ -192,19 +230,22 @@ Then open `http://<device-ip>` from your phone. Port 80 needs
 ```
 index.py            Flask app: routes, auth, mode gating
 appstate.py         active/idle mode, Drive reachability, SD mount/unmount, flash persist
-store.py            durable settings, persisted to Drive as JSON
-gdrive.py           Google Drive: auth, account info, folders, upload, dedup, JSON I/O
+store.py            durable settings, persisted to a local file + boot flash
+gdrive.py           Google Drive: auth, account info, folders, upload, dedup
 deviceauth.py       on-device Google authorization (OAuth device flow)
 sdcard.py           detect the SD card (mounted and unmounted), list images, derive folder name
 processor.py        background worker: scan → upload → (optional) delete → (optional) unmount
 helper.py           password verify/set
+notify.py           email notification to the Drive account's address when an upload finishes
+lcd.py              optional I2C OLED status display (WiFi/Ethernet/AP/upload-progress screens)
 authorize_drive.py  alternative one-time OAuth helper (run on a laptop)
 wifi.py             WiFi setup AP, scan, connect/disconnect, known-network auto-reconnect
 settings.py         configuration (not committed)
 templates/ static/  web UI (home, config, authorize, sign-in, WiFi setup pages)
-install.sh          dependency install + systemd service + SD automount + WiFi + sudoers rules
+install.sh          dependency install + systemd service + SD automount + WiFi + LCD + sudoers rules
 run_server.sh       start gunicorn
-known_networks.json known WiFi networks (priority-ordered, most recent first) — runtime, not committed
+known_networks.json      known WiFi networks (priority-ordered, most recent first) — runtime, not committed
+image_uploader_settings.json  durable settings (see store.py) — runtime, not committed
 helpers/
   sd-automount.sh            mount an SD card partition under /media on insert or on
                              demand (uses systemd-mount, not raw mount — see below)
@@ -212,7 +253,7 @@ helpers/
   wifi-ap.sh                 start/stop the WiFi setup access point (hostapd + dnsmasq)
   wifi-sta.sh                start/stop wlan0 station mode (dedicated wpa_supplicant + dhcpcd)
   wifi-scan.sh               scan for nearby WiFi networks
-  flash-persist.sh           copy a file onto the boot flash (token.json, known_networks.json)
+  flash-persist.sh           copy a file onto the boot flash (token.json, known_networks.json, settings)
 ```
 
 ## Notes and limitations
@@ -231,7 +272,10 @@ helpers/
   `mount(2)` syscall for scripts it runs directly, so a raw `mount` call fails
   silently. The mount owner/group is read from `/etc/sd-automount.conf`
   (`MOUNT_USER=...`, written by `install.sh` with the user running the
-  service).
+  service). The udev rule matches any `sd[a-z][0-9]` device — on boards where
+  the root filesystem is itself `/dev/sda1`, that also mounts the root disk a
+  second time under `/media`; `sdcard.py` explicitly excludes whatever device
+  backs `/` from scanning, so it's never mistaken for a card.
 - **Manual mount button:** the home page shows the SD card's mount status
   (device name included) and, if a card is plugged in but not mounted, a
   **Mount** button that calls the same `sd-automount.sh` helper as the udev
@@ -259,3 +303,13 @@ helpers/
   Netplan) and removes any leftover `/etc/netplan/90-cloud-upload-wifi.yaml`
   from an older install, since the app now runs its own dedicated
   `wpa_supplicant` instance for `wlan0` instead.
+- The systemd unit starts `After=network.target`, not
+  `network-online.target` — the latter waits for full connectivity, which
+  can stall boot for minutes on Ethernet with no cable plugged in. The app
+  handles having no network at boot on its own (idle mode, WiFi setup AP).
+- **Boot media matters.** If the OS boots from a USB flash drive, prefer a
+  plain USB2.0 drive. Some USB3.2 drives fail the USB2.0 high-speed ("chirp")
+  handshake on this board's controller and fall back to full-speed
+  (12 Mb/s instead of 480 Mb/s), which can add tens of seconds to every boot
+  loading the kernel/initrd. Check actual link speed at the U-Boot prompt with
+  `usb tree`.
