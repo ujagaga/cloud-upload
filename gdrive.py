@@ -1,5 +1,4 @@
 import os
-import json
 import hashlib
 import mimetypes
 
@@ -7,7 +6,7 @@ import settings
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload, MediaInMemoryUpload
+from googleapiclient.http import MediaFileUpload
 
 SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
@@ -99,34 +98,6 @@ def list_folder_files(service, folder_id: str) -> dict:
         if not page_token:
             break
     return result
-
-
-def read_json(service, name: str, folder_id: str):
-    """Return the parsed JSON of a file by name in a folder, or None if absent."""
-    query = f"'{folder_id}' in parents and name='{_escape(name)}' and trashed=false"
-    resp = service.files().list(q=query, spaces="drive", fields="files(id)").execute()
-    files = resp.get("files", [])
-    if not files:
-        return None
-    raw = service.files().get_media(fileId=files[0]["id"]).execute()
-    return json.loads(raw)
-
-
-def write_json(service, name: str, folder_id: str, data: dict):
-    """Create or overwrite a JSON file by name in a folder."""
-    body = json.dumps(data, indent=2).encode("utf-8")
-    media = MediaInMemoryUpload(body, mimetype="application/json")
-
-    query = f"'{folder_id}' in parents and name='{_escape(name)}' and trashed=false"
-    resp = service.files().list(q=query, spaces="drive", fields="files(id)").execute()
-    files = resp.get("files", [])
-    if files:
-        service.files().update(fileId=files[0]["id"], media_body=media).execute()
-    else:
-        service.files().create(
-            body={"name": name, "parents": [folder_id]},
-            media_body=media, fields="id",
-        ).execute()
 
 
 def file_md5(path: str) -> str:

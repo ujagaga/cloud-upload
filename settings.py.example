@@ -29,10 +29,11 @@ FLASH_DEVICE = ""                       # e.g. "/dev/mmcblk0p1" or "/dev/sda1"
 FLASH_MOUNTPOINT = "/mnt/flash"         # temporary mount point (created if needed)
 FLASH_TOKEN_DEST = "token.json"  # path of token.json within the flash
 FLASH_KNOWN_NETWORKS_DEST = "known_networks.json"  # path of known_networks.json within the flash
+FLASH_SETTINGS_DEST = "image_uploader_settings.json"  # path of SETTINGS_FILE within the flash
 # Target folder in Drive. Created if it does not exist.
 DRIVE_FOLDER_NAME = "CloudUpload"
-# Persisted app state (password, options) lives here in the Drive folder. The OS
-# runs stateless in RAM, so this is the only durable storage.
+# Persisted app state (password, options) lives in this local file, copied to
+# the boot flash the same way as token.json/known_networks.json.
 SETTINGS_FILE = "image_uploader_settings.json"
 
 # ---------------------- SD card / images ----------------------

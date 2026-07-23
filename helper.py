@@ -20,5 +20,5 @@ def verify_password(password: str) -> bool:
 
 
 def set_password(new_password: str):
-    """Persist a new password hash to Drive. Raises if Drive is unreachable."""
+    """Persist a new password hash locally."""
     store.set("password_hash", generate_password_hash(new_password))

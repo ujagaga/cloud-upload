@@ -86,10 +86,6 @@ def change_password():
         flash("New password cannot be empty.")
         return redirect(url_for('config'))
 
-    if not appstate.is_active():
-        flash("Cannot save: Google Drive not reachable.")
-        return redirect(url_for('config'))
-
     if not helper.verify_password(current):
         flash("Current password is wrong.")
         return redirect(url_for('config'))
@@ -98,7 +94,7 @@ def change_password():
         helper.set_password(new)
         flash("Password changed.")
     except Exception as exc:
-        flash(f"Could not save password to Drive: {exc}")
+        flash(f"Could not save password: {exc}")
     return redirect(url_for('config'))
 
 
@@ -157,15 +153,12 @@ def mount_card():
 @application.route('/settings', methods=['POST'])
 @login_required
 def save_settings():
-    if not appstate.is_active():
-        flash("Cannot save: Google Drive not reachable.")
-        return redirect(url_for('config'))
     try:
         store.set('delete_after_upload', bool(request.form.get('delete_after_upload')))
         store.set('auto_upload', bool(request.form.get('auto_upload')))
         flash("Settings saved.")
     except Exception as exc:
-        flash(f"Could not save settings to Drive: {exc}")
+        flash(f"Could not save settings: {exc}")
     return redirect(url_for('config'))
 
 

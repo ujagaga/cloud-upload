@@ -168,8 +168,11 @@ def _go_idle(reason):
 
 
 def startup():
-    """Decide the mode: load settings from Drive (active) or unmount and idle."""
+    """Load local settings, then decide the mode: active when Drive is
+    reachable, otherwise idle."""
     global _mode, _reason
+
+    store.load()
 
     if not gdrive.is_authorized():
         _go_idle(f"No Google Drive credentials ({settings.TOKEN_FILE}).")
@@ -179,15 +182,9 @@ def startup():
         _go_idle("No Google Drive access.")
         return
 
-    try:
-        store.load()
-    except Exception as exc:
-        _go_idle(f"Failed to load settings from Drive: {exc}")
-        return
-
     _mode = MODE_ACTIVE
     _reason = ""
-    print("ACTIVE: Drive reachable, settings loaded.")
+    print("ACTIVE: Drive reachable.")
 
 
 def retry():

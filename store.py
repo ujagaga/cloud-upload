@@ -1,10 +1,16 @@
-"""Durable app state, persisted to Google Drive as a single JSON file.
+"""Durable app state, persisted to a local JSON file.
 
-The OS runs stateless in RAM, so Drive is the only place settings survive a
-reboot. Loaded once at startup; every change is written straight back to Drive.
+The OS runs from RAM, so every save also copies the file onto the boot
+flash (same mechanism as token.json/known_networks.json) to survive a
+reboot.
 """
+import json
+import os
+
 import settings
-import gdrive
+
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+STORE_PATH = os.path.join(_script_dir, settings.SETTINGS_FILE)
 
 DEFAULTS = {
     "password_hash": None,
@@ -21,24 +27,28 @@ def is_loaded() -> bool:
 
 
 def load():
-    """Download settings from Drive into memory. Raises on Drive failure."""
+    """Load settings from the local file into memory, if present."""
     global _data, _loaded
-    service = gdrive.get_service()
-    root_id = gdrive.ensure_folder(service, settings.DRIVE_FOLDER_NAME)
-    remote = gdrive.read_json(service, settings.SETTINGS_FILE, root_id)
-
     data = dict(DEFAULTS)
-    if isinstance(remote, dict):
-        data.update(remote)
+    if os.path.isfile(STORE_PATH):
+        with open(STORE_PATH) as f:
+            remote = json.load(f)
+        if isinstance(remote, dict):
+            data.update(remote)
     _data = data
     _loaded = True
 
 
 def save():
-    """Upload the current settings to Drive. Raises on Drive failure."""
-    service = gdrive.get_service()
-    root_id = gdrive.ensure_folder(service, settings.DRIVE_FOLDER_NAME)
-    gdrive.write_json(service, settings.SETTINGS_FILE, root_id, _data)
+    """Write the current settings to the local file and the boot flash."""
+    with open(STORE_PATH, "w") as f:
+        json.dump(_data, f)
+
+    # Same reason token.json needs this: the OS runs from RAM, so anything
+    # written at runtime needs a copy on the boot flash to survive a reboot.
+    import appstate
+    ok, msg = appstate.persist_file_to_flash(STORE_PATH, settings.FLASH_SETTINGS_DEST, "settings")
+    print(f"Flash persist: {msg}")
 
 
 def get(key, default=None):
@@ -46,6 +56,6 @@ def get(key, default=None):
 
 
 def set(key, value):
-    """Update a value in memory and persist to Drive."""
+    """Update a value in memory and persist to the local file."""
     _data[key] = value
     save()

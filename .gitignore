@@ -1,6 +1,7 @@
 __pycache__
 client_secret.json
 token.json
+image_uploader_settings.json
 settings.py
 .idea
 .venv
