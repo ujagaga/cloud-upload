@@ -20,6 +20,7 @@ BIG_LINE_HEIGHT = 16
 
 _device = None
 _big_font = None
+_last_percent = None
 
 
 def _get_device():
@@ -71,17 +72,25 @@ def _drive_line(drive_ok, drive_reason):
     return "GDrive: connected" if drive_ok else f"GDrive: {drive_reason or 'idle'}"
 
 
+def _bottom_lines():
+    """The last upload's percentage, kept on screen (as the bottom row) even
+    after the display moves on to a WiFi/Ethernet status screen."""
+    return [] if _last_percent is None else [f"{_last_percent}% uploaded"]
+
+
 def show_ap_screen(ssid, password, ip):
-    show_lines("Setup WiFi:", f"SSID: {ssid}", f"Pass: {password}", (ip, "big"))
+    show_lines("Setup WiFi:", f"SSID: {ssid}", f"Pass: {password}", (ip, "big"), *_bottom_lines())
 
 
 def show_station_screen(ip, drive_ok, drive_reason=""):
-    show_lines("WiFi connected", (ip, "big"), _drive_line(drive_ok, drive_reason))
+    show_lines("WiFi connected", (ip, "big"), _drive_line(drive_ok, drive_reason), *_bottom_lines())
 
 
 def show_ethernet_screen(ip, drive_ok, drive_reason=""):
-    show_lines("Ethernet connected", (ip, "big"), _drive_line(drive_ok, drive_reason))
+    show_lines("Ethernet connected", (ip, "big"), _drive_line(drive_ok, drive_reason), *_bottom_lines())
 
 
-def show_upload_screen(done, total, elapsed_minutes):
-    show_lines(f"{done}/{total} in {elapsed_minutes}min")
+def show_upload_screen(done, total, elapsed_minutes, uploaded_bytes, total_bytes):
+    global _last_percent
+    _last_percent = int(uploaded_bytes * 100 / total_bytes) if total_bytes else 0
+    show_lines(f"{done}/{total} in {elapsed_minutes}min", *_bottom_lines())

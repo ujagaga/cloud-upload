@@ -74,6 +74,8 @@ def _worker(images, folder_name, delete_after):
     aborted = False
     stopped = False
     start = time.monotonic()
+    total_bytes = sum(os.path.getsize(p) for p in images)
+    uploaded_bytes = 0
     try:
         service = gdrive.get_service()
         root_id = gdrive.ensure_folder(service, settings.DRIVE_FOLDER_NAME)
@@ -86,6 +88,7 @@ def _worker(images, folder_name, delete_after):
                 break
 
             name = os.path.basename(src)
+            size = os.path.getsize(src)
             with _lock:
                 _state["current"] = name
 
@@ -111,8 +114,11 @@ def _worker(images, folder_name, delete_after):
                 with _lock:
                     _state["done"] += 1
 
+            if confirmed:
+                uploaded_bytes += size
+
             elapsed_min = int((time.monotonic() - start) // 60)
-            lcd.show_upload_screen(_state["done"], len(images), elapsed_min)
+            lcd.show_upload_screen(_state["done"], len(images), elapsed_min, uploaded_bytes, total_bytes)
 
             if confirmed:
                 with _lock:
