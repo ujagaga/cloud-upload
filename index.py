@@ -108,11 +108,7 @@ def config():
         auto_upload=bool(store.get('auto_upload')),
         drive_authorized=gdrive.is_authorized(),
         drive_email=gdrive.get_account_email() if gdrive.is_authorized() else None,
-        notify_email=store.get('notify_email'),
-        smtp_server=store.get('smtp_server'),
-        smtp_port=store.get('smtp_port'),
-        smtp_user=store.get('smtp_user'),
-        smtp_pass=store.get('smtp_pass'),
+        notify_on_upload=bool(store.get('notify_on_upload')),
     )
 
 
@@ -161,24 +157,10 @@ def save_settings():
     try:
         store.set('delete_after_upload', bool(request.form.get('delete_after_upload')))
         store.set('auto_upload', bool(request.form.get('auto_upload')))
+        store.set('notify_on_upload', bool(request.form.get('notify_on_upload')))
         flash("Settings saved.")
     except Exception as exc:
         flash(f"Could not save settings: {exc}")
-    return redirect(url_for('config'))
-
-
-@application.route('/notify_settings', methods=['POST'])
-@login_required
-def notify_settings():
-    try:
-        store.set('notify_email', request.form.get('notify_email', '').strip())
-        store.set('smtp_server', request.form.get('smtp_server', '').strip())
-        store.set('smtp_port', request.form.get('smtp_port', '').strip())
-        store.set('smtp_user', request.form.get('smtp_user', '').strip())
-        store.set('smtp_pass', request.form.get('smtp_pass', ''))
-        flash("Email settings saved.")
-    except Exception as exc:
-        flash(f"Could not save email settings: {exc}")
     return redirect(url_for('config'))
 
 

@@ -16,11 +16,7 @@ DEFAULTS = {
     "password_hash": None,
     "delete_after_upload": False,
     "auto_upload": True,
-    "notify_email": "",
-    "smtp_server": "",
-    "smtp_port": "",
-    "smtp_user": "",
-    "smtp_pass": "",
+    "notify_on_upload": False,
 }
 
 _data = dict(DEFAULTS)

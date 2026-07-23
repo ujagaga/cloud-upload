@@ -58,23 +58,13 @@
         </span>
         Automatically upload when an SD card is inserted
       </label>
-    </form>
-  </div>
-
-  <div class="card">
-    <h2>Email notifications</h2>
-    <form method="POST" action="{{ url_for('notify_settings') }}" class="update_buttons">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="text" name="notify_email" placeholder="Notify email (optional)" value="{{ notify_email or '' }}">
-      <p class="muted">Leave any field below blank to use the default from settings.py.</p>
-      <input type="text" name="smtp_server" placeholder="SMTP server override" value="{{ smtp_server or '' }}">
-      <input type="text" name="smtp_port" placeholder="SMTP port override" value="{{ smtp_port or '' }}">
-      <input type="text" name="smtp_user" placeholder="SMTP user override" value="{{ smtp_user or '' }}">
-      <div class="password_row">
-        <input type="password" id="smtp_pass" name="smtp_pass" placeholder="SMTP password override" value="{{ smtp_pass or '' }}">
-        <button type="button" class="toggle_pw" data-target="smtp_pass" title="Show password"><i class="fa-solid fa-eye"></i></button>
-      </div>
-      <button type="submit" class="save_btn">Save</button>
+      <label class="checkbox_row">
+        <span class="switch">
+          <input type="checkbox" name="notify_on_upload" onchange="this.form.submit()" {% if notify_on_upload %}checked{% endif %}>
+          <span class="switch_slider"></span>
+        </span>
+        Automatically send email when upload is finished
+      </label>
     </form>
   </div>
 
