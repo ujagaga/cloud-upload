@@ -10,7 +10,7 @@ if ! sudo apt update -y; then
   exit 1
 fi
 
-if ! sudo apt install -y python3-pip python3-venv hostapd dnsmasq; then
+if ! sudo apt install -y python3-pip python3-venv hostapd dnsmasq i2c-tools; then
   echo "Error: Failed to install dependencies. Aborting installation."
   exit 1
 fi
@@ -140,6 +140,16 @@ sudo systemctl disable --now wpa_supplicant.service 2>/dev/null
 sudo systemctl mask wpa_supplicant.service
 
 # --- I2C OLED status display (optional hardware; harmless if not wired) ---
+echo "Enabling the I2C3 device tree overlay (for /dev/i2c-2, the status display)..."
+if ! grep -q "i2c3-ph" /boot/armbianEnv.txt 2>/dev/null; then
+  if grep -q "^overlays=" /boot/armbianEnv.txt 2>/dev/null; then
+    sudo sed -i '/^overlays=/ s/$/ i2c3-ph/' /boot/armbianEnv.txt
+  else
+    echo "overlays=i2c3-ph" | sudo tee -a /boot/armbianEnv.txt > /dev/null
+  fi
+  echo "Overlay added — a reboot is needed before /dev/i2c-2 exists."
+fi
+
 echo "Adding $USER to the i2c group (for /dev/i2c-* access, e.g. the status display)..."
 sudo usermod -aG i2c "$USER"
 
