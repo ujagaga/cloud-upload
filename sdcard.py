@@ -1,5 +1,6 @@
 import os
 import glob
+import subprocess
 from datetime import datetime
 
 import settings
@@ -34,18 +35,35 @@ def find_unmounted_card():
     return None
 
 
+def _device_of(path):
+    try:
+        out = subprocess.run(["findmnt", "--target", path, "-no", "SOURCE"],
+                              capture_output=True, text=True)
+        return out.stdout.strip() or None
+    except FileNotFoundError:
+        return None
+
+
 def _candidate_roots():
     """Yield likely mount points under the configured scan paths.
 
     Removable media typically mounts as /media/<label>, /media/<user>/<label>
     or /run/media/<user>/<label>, so we look one and two levels deep.
+
+    The SD-automount udev rule matches any sd[a-z][0-9] device, which on some
+    boards (root filesystem on /dev/sda1) also fires for the system's own
+    root disk, mounting it a second time under /media. Skip any candidate
+    backed by that same device so it's never scanned as if it were a card.
     """
+    root_dev = _device_of("/")
     roots = []
     for base in settings.SD_SCAN_PATHS:
         if not os.path.isdir(base):
             continue
         for entry in os.scandir(base):
             if not entry.is_dir():
+                continue
+            if root_dev and _device_of(entry.path) == root_dev:
                 continue
             roots.append(entry.path)
             # one level deeper (e.g. /media/<user>/<label>)
