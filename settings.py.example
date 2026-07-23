@@ -57,3 +57,12 @@ FOLDER_DATE_FORMAT = "%Y-%m-%d"
 WIFI_AP_SSID = "CloudUpload-Setup"
 WIFI_AP_PASSWORD = "setupwifi123"   # WPA2 passphrase for the setup AP itself
 WIFI_CONNECT_TIMEOUT = 30           # seconds to wait for the chosen network before reverting to the AP
+
+# ---------------------- E-mail ------------------------------
+# Sends a summary email when an upload run finishes, if a notify address is
+# set on the Config page. These are the defaults; any of them can be
+# overridden per-device from the same page.
+SMTP_SERVER = "smtp.example.com"
+SMTP_PORT = 587
+SMTP_USER = "user@example.com"
+SMTP_PASS = "change-this-password"

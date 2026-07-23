@@ -7,6 +7,7 @@ import sdcard
 import gdrive
 import appstate
 import lcd
+import notify
 
 _lock = threading.Lock()
 _thread = None
@@ -157,6 +158,9 @@ def _worker(images, folder_name, delete_after):
 
     with _lock:
         all_succeeded = not aborted and not stopped and not _state["errors"]
+        message = _state["message"]
+
+    notify.send_upload_summary(message)
 
     if delete_after or all_succeeded:
         # images[0]'s directory, not images[0] itself: delete_after may have
