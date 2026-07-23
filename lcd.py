@@ -9,14 +9,17 @@ try:
     from luma.core.interface.serial import i2c
     from luma.core.render import canvas
     from luma.oled.device import sh1106
+    from PIL import ImageFont
 except ImportError:
-    i2c = canvas = sh1106 = None
+    i2c = canvas = sh1106 = ImageFont = None
 
 I2C_PORT = 2
 I2C_ADDRESS = 0x3C
 LINE_HEIGHT = 12
+BIG_LINE_HEIGHT = 20
 
 _device = None
+_big_font = None
 
 
 def _get_device():
@@ -27,10 +30,20 @@ def _get_device():
     return _device
 
 
+def _get_big_font():
+    global _big_font
+    if _big_font is None:
+        _big_font = ImageFont.load_default(size=16)
+    return _big_font
+
+
 def show_lines(*lines):
-    """Render up to a handful of short text lines, one per row. A no-op if
-    luma.oled isn't installed or the display isn't actually wired up —
-    this is a convenience readout, never a hard dependency."""
+    """Render up to a handful of short text lines, one per row. A line is
+    either a str (default small font) or a (text, "big") tuple for a larger
+    font — used for the IP address, which is hard to read at the default
+    size. A no-op if luma.oled isn't installed or the display isn't
+    actually wired up — this is a convenience readout, never a hard
+    dependency."""
     if sh1106 is None:
         return
     try:
@@ -38,8 +51,12 @@ def show_lines(*lines):
         with canvas(device) as draw:
             y = 0
             for line in lines:
-                draw.text((0, y), line, fill="white")
-                y += LINE_HEIGHT
+                if isinstance(line, tuple):
+                    draw.text((0, y), line[0], fill="white", font=_get_big_font())
+                    y += BIG_LINE_HEIGHT
+                else:
+                    draw.text((0, y), line, fill="white")
+                    y += LINE_HEIGHT
     except Exception as exc:
         print(f"LCD update failed: {exc}")
 
@@ -49,12 +66,12 @@ def _drive_line(drive_ok, drive_reason):
 
 
 def show_ap_screen(ssid, password, ip):
-    show_lines("Setup WiFi:", f"SSID: {ssid}", f"Pass: {password}", f"IP: {ip}")
+    show_lines("Setup WiFi:", f"SSID: {ssid}", f"Pass: {password}", (f"IP: {ip}", "big"))
 
 
 def show_station_screen(ip, drive_ok, drive_reason=""):
-    show_lines("WiFi connected", f"IP: {ip}", _drive_line(drive_ok, drive_reason))
+    show_lines("WiFi connected", (f"IP: {ip}", "big"), _drive_line(drive_ok, drive_reason))
 
 
 def show_ethernet_screen(ip, drive_ok, drive_reason=""):
-    show_lines("Ethernet connected", f"IP: {ip}", _drive_line(drive_ok, drive_reason))
+    show_lines("Ethernet connected", (f"IP: {ip}", "big"), _drive_line(drive_ok, drive_reason))
