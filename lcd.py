@@ -30,10 +30,16 @@ def _get_device():
     return _device
 
 
+BIG_FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
+
+
 def _get_big_font():
     global _big_font
     if _big_font is None:
-        _big_font = ImageFont.load_default(size=16)
+        try:
+            _big_font = ImageFont.truetype(BIG_FONT_PATH, 16)
+        except OSError:
+            _big_font = ImageFont.load_default(size=16)
     return _big_font
 
 
@@ -66,12 +72,12 @@ def _drive_line(drive_ok, drive_reason):
 
 
 def show_ap_screen(ssid, password, ip):
-    show_lines("Setup WiFi:", f"SSID: {ssid}", f"Pass: {password}", (f"IP: {ip}", "big"))
+    show_lines("Setup WiFi:", f"SSID: {ssid}", f"Pass: {password}", (ip, "big"))
 
 
 def show_station_screen(ip, drive_ok, drive_reason=""):
-    show_lines("WiFi connected", (f"IP: {ip}", "big"), _drive_line(drive_ok, drive_reason))
+    show_lines("WiFi connected", (ip, "big"), _drive_line(drive_ok, drive_reason))
 
 
 def show_ethernet_screen(ip, drive_ok, drive_reason=""):
-    show_lines("Ethernet connected", (f"IP: {ip}", "big"), _drive_line(drive_ok, drive_reason))
+    show_lines("Ethernet connected", (ip, "big"), _drive_line(drive_ok, drive_reason))
