@@ -81,3 +81,7 @@ def show_station_screen(ip, drive_ok, drive_reason=""):
 
 def show_ethernet_screen(ip, drive_ok, drive_reason=""):
     show_lines("Ethernet connected", (ip, "big"), _drive_line(drive_ok, drive_reason))
+
+
+def show_upload_screen(done, total, elapsed_minutes):
+    show_lines(f"{done}/{total} in {elapsed_minutes}min")

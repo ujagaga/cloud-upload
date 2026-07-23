@@ -1,10 +1,12 @@
 import os
 import threading
+import time
 
 import settings
 import sdcard
 import gdrive
 import appstate
+import lcd
 
 _lock = threading.Lock()
 _thread = None
@@ -71,6 +73,7 @@ def _reset(total, folder, message=""):
 def _worker(images, folder_name, delete_after):
     aborted = False
     stopped = False
+    start = time.monotonic()
     try:
         service = gdrive.get_service()
         root_id = gdrive.ensure_folder(service, settings.DRIVE_FOLDER_NAME)
@@ -107,6 +110,9 @@ def _worker(images, folder_name, delete_after):
             finally:
                 with _lock:
                     _state["done"] += 1
+
+            elapsed_min = int((time.monotonic() - start) // 60)
+            lcd.show_upload_screen(_state["done"], len(images), elapsed_min)
 
             if confirmed:
                 with _lock:
