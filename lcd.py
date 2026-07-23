@@ -16,7 +16,7 @@ except ImportError:
 I2C_PORT = 2
 I2C_ADDRESS = 0x3C
 LINE_HEIGHT = 12
-BIG_LINE_HEIGHT = 20
+BIG_LINE_HEIGHT = 16
 
 _device = None
 _big_font = None
@@ -37,9 +37,9 @@ def _get_big_font():
     global _big_font
     if _big_font is None:
         try:
-            _big_font = ImageFont.truetype(BIG_FONT_PATH, 16)
+            _big_font = ImageFont.truetype(BIG_FONT_PATH, 13)
         except OSError:
-            _big_font = ImageFont.load_default(size=16)
+            _big_font = ImageFont.load_default(size=13)
     return _big_font
 
 
