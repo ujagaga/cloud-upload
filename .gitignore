@@ -7,3 +7,4 @@ settings.py
 .venv
 app.log
 app.log.*
+*.FCBak
